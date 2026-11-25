@@ -55,8 +55,7 @@ rows below are in press order. Screenshots: `hands-on/probe.png` (full sequence)
 | `%` | ShiftLeft down; `Key Num5` down `mods=S`; `Text "%"`; Num5 up; ShiftLeft up | OK. Logical key is `Num5`, text carries `%`. |
 | `"` | ShiftLeft down; `Key Quote` down `mods=S`; `Text "\""`; Quote up; ShiftLeft up | OK. Logical key `Quote`, text `"`. |
 | `Shift-Up` | ShiftLeft down; `Key ArrowUp` down/up `mods=S`; ShiftLeft up | OK. |
-| `Ctrl-Up` | ControlLeft down/up only, **no ArrowUp** | Swallowed by macOS (Mission Control default). |
-| (unexpected) | `Key F5` down/up `mods=-` | Appeared between Ctrl-Up and Esc in both attempts; not one of the keys pressed. Source unknown (possibly the compact keyboard or a system shortcut side effect). |
+| `Ctrl-Up` | ControlLeft down/up, then `Key F5` down/up `mods=-`; **no ArrowUp** | The app never sees Ctrl+ArrowUp: macOS takes it for Mission Control, and the app then receives a bare `F5` with no modifiers (Samuel confirmed the F5 comes from this key press; seen in both runs). |
 | `Esc` | `Key Escape` down/up `mods=-` | OK. |
 | `Option-1` | AltLeft down; `Key Num1` down `mods=M`, `physical=Some(Num1)`; `Text "¡"`; AltLeft up; Num1 up `mods=-` | OK (re-tested on a fresh launch, screenshot `hands-on/probe-option1.png`). Produces text `¡`, so matching must use the key + modifiers, not the text. In the first pass Samuel mistyped Option-i instead; that showed `Key I` `mods=M` with a text event, as expected for Option-i. |
 | `PgUp` | — | Not tested (no PgUp on keyboard). |
@@ -68,8 +67,8 @@ rows below are in press order. Screenshots: `hands-on/probe.png` (full sequence)
 
 - **Option+digit is fine.** `Option-1` gives `Num1` + `mods=M` (physical `Num1`) plus a `Text "¡"`
   event. Cards for `M-1`..`M-9` should match on the key event and ignore the text.
-- **Ctrl-Up never reaches the app** (Mission Control). Cards that use `C-Up` need a note or an
-  alternative binding on macOS.
-- **Stray F5** appeared after Ctrl-Up in both runs; unexplained, recorded as observed.
+- **Ctrl-Up never reaches the app** (Mission Control). Instead the app gets the Ctrl press/release
+  and then a bare `F5` (no modifiers). Cards that use `C-Up` need a note or an alternative binding
+  on macOS, and the grader must not count that stray `F5` as a wrong answer (or should explain it).
 - Modifier-press events carry the modifier set *before* the change (e.g. ShiftLeft down shows
   `mods=-`, ShiftLeft up shows `mods=S`); expected for egui but matters for matching logic.
