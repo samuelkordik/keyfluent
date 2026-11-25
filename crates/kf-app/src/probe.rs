@@ -52,12 +52,17 @@ pub struct ProbeApp {
     log: Vec<String>,
 }
 
+impl ProbeApp {
+    /// Stops egui from consuming keys for its own shortcuts (Cmd/Ctrl +/- zoom).
+    /// No widget here is focusable, so Tab has no focus to move.
+    pub fn new(ctx: &egui::Context) -> Self {
+        ctx.options_mut(|o| o.zoom_with_keyboard = false);
+        Self::default()
+    }
+}
+
 impl eframe::App for ProbeApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        // Stop egui from consuming keys for its own shortcuts (Cmd/Ctrl +/- zoom).
-        // No widget here is focusable, so Tab has no focus to move.
-        ui.ctx().options_mut(|o| o.zoom_with_keyboard = false);
-
         let events = ui.ctx().input(|i| i.raw.events.clone());
         self.log.extend(events.iter().filter_map(describe));
         if self.log.len() > MAX_LINES {

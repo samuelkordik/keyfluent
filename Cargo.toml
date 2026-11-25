@@ -8,7 +8,7 @@ edition = "2021"
 license = "MIT"
 authors = ["Samuel Kordik"]
 repository = "https://github.com/samuelkordik/keyfluent"
-rust-version = "1.85"
+rust-version = "1.95"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -13,9 +13,9 @@ fn main() -> eframe::Result {
     eframe::run_native(
         APP_NAME,
         options,
-        Box::new(move |_cc| {
+        Box::new(move |cc| {
             if key_probe {
-                Ok(Box::<ProbeApp>::default())
+                Ok(Box::new(ProbeApp::new(&cc.egui_ctx)))
             } else {
                 Ok(Box::<KeyfluentApp>::default())
             }

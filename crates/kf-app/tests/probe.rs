@@ -48,7 +48,7 @@ fn describes_ctrl_b_and_percent() {
 
 #[test]
 fn probe_logs_typed_text() {
-    let mut h = Harness::builder().build_eframe(|_| ProbeApp::default());
+    let mut h = Harness::builder().build_eframe(|cc| ProbeApp::new(&cc.egui_ctx));
     h.key_press(egui::Key::A);
     h.event(egui::Event::Text("%".into()));
     h.run_steps(2);

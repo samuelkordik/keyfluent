@@ -29,6 +29,13 @@ workspace), `open`/`killall` for the built app, `screencapture`, `sw_vers`, `cod
 `lipo -info`, `plutil -p` (on files in the build), `ls`, `cat`, `grep`, `find`, `du`, `sed` (to
 sanitize your own report).
 
+## First time
+
+Samuel clones the repository once (`git clone https://github.com/samuelkordik/keyfluent`) and
+starts your session **inside** the clone. You never clone anything yourself. If the verify run
+reports a missing Rust target, run the `rustup target add ...` from the list above (it is
+allowed), then run `scripts/mac/verify.sh` again.
+
 ## A round, step by step
 
 1. `git fetch origin && git switch main && git pull --ff-only`. If `git status` shows local
@@ -40,7 +47,8 @@ sanitize your own report).
 3. If a step failed, **diagnose** (read-only): read the end of `build.log` in the run folder and
    the failing source files. Write the error, file and line, your best explanation and a suggested
    fix in the report. List **every** `error:` line, not only the first. Don't change code.
-4. **Key probe check (this round).** Run `open dist/Keyfluent.app --args --key-probe`. The key
+4. **Key probe check (this round).** Run `killall Keyfluent 2>/dev/null; open -n dist/Keyfluent.app --args --key-probe`
+   (`open` ignores `--args` when the app is already running, hence the `killall` and `-n`). The key
    probe window shows what the app receives for each key press. Press each of these, one at a
    time, and note exactly what the probe shows (key name, modifiers, text, anything odd, or
    "nothing shown"):
@@ -50,8 +58,12 @@ sanitize your own report).
 
    (`%` and `"` are typed with Shift on a US layout; say which layout is active.) Some of these
    may be swallowed by macOS (`Ctrl-Up` is Mission Control by default); if so, record that, not a
-   guess. Save a screenshot of the probe after the last key as `<run>/hands-on/probe.png`
-   (`screencapture -x`). Close the app with `killall Keyfluent`.
+   guess. Save a screenshot of the probe window only (not the whole screen, which may show other apps)
+   after the last key as `<run>/hands-on/probe.png`, with `screencapture -x -o -l <window id>`
+   or a region, `screencapture -x -R x,y,w,h`. The first use needs the Screen Recording
+   permission: ask Samuel to grant it (System Settings > Privacy & Security). Screenshots of
+   5 MB or more are not published (`verify.sh` warns); keep them small. Close the app with
+   `killall Keyfluent`.
 5. Replace the "Key probe (hands-on)" placeholder section in `<run>/report.md` with a table:
    `| Key pressed | Probe shows | Notes |`, one row per key above.
 6. `scripts/mac/verify.sh --publish-run out/mac/<date>-<commit>` — pushes the updated report and

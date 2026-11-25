@@ -22,8 +22,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --publish) PUBLISH=1 ;;
     --allow-dirty) ALLOW_DIRTY=1 ;;
-    --publish-run) PUBLISH_RUN="${2:-}"; shift ;;
-    -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
+    --publish-run)
+      [[ $# -ge 2 && -n "$2" ]] || die "--publish-run needs a run folder, e.g. --publish-run out/mac/<date>-<commit>"
+      PUBLISH_RUN="$2"; shift ;;
+    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
     *) die "unknown option $1" ;;
   esac
   shift
@@ -36,12 +38,18 @@ sanitize() { sed -e "s#$ROOT#<repo>#g" -e "s#$HOME#~#g"; }
 # ---------------------------------------------------------------- publish
 publish() {
   local run="${1%/}"
-  case "$run" in out/mac/[0-9]*) ;; *) die "refusing to publish '$run': only out/mac/<run> folders" ;; esac
+  [[ -d "$run" ]] || die "no such run folder: $run"
+  run=$(cd "$run" && pwd -P) || die "cannot resolve $run"
+  case "$run" in
+    "$ROOT"/out/mac/[0-9]*) ;;
+    *) die "refusing to publish '$1': only out/mac/<run> folders" ;;
+  esac
   [[ -f "$run/report.md" ]] || die "$run has no report.md"
   local name base wt
   name=$(basename "$run")
   base=$(mktemp -d)
   wt="$base/mac-results"
+  git worktree prune
   if git fetch -q origin mac-results 2>/dev/null; then
     git worktree add -q -B mac-results "$wt" origin/mac-results || die "worktree failed"
   elif git show-ref -q --verify refs/heads/mac-results; then
@@ -53,6 +61,13 @@ publish() {
   local dest="$wt/runs/$name"
   mkdir -p "$dest"
   # Allow-list: reports, logs and screenshots only (no app, no binaries).
+  local big
+  big=$(cd "$run" && find . -type f \( -name '*.md' -o -name '*.txt' -o -name '*.log' -o -name '*.png' \) \
+      -size +5M -print)
+  if [[ -n "$big" ]]; then
+    echo "verify: WARNING: not published (5 MB or larger):" >&2
+    printf '%s\n' "$big" | while read -r f; do echo "  $f" >&2; done
+  fi
   (cd "$run" && find . -type f \( -name '*.md' -o -name '*.txt' -o -name '*.log' -o -name '*.png' \) \
       -size -5M -print) |
     while read -r f; do
@@ -125,7 +140,17 @@ step() {
 check_tools() {
   local missing=()
   xcrun --sdk macosx --show-sdk-path >/dev/null 2>&1 || missing+=("Xcode command line tools: xcode-select --install")
-  command -v cargo >/dev/null || missing+=("Rust: https://rustup.rs")
+  if ! command -v cargo >/dev/null; then
+    missing+=("Rust: https://rustup.rs")
+  else
+    local ver
+    ver=$(rustc --version 2>/dev/null | sed -n 's/^rustc \([0-9]*\)\.\([0-9]*\).*/\1 \2/p')
+    # shellcheck disable=SC2086  # intentional split into major/minor
+    set -- $ver
+    if [[ $# -ne 2 ]] || [[ $1 -lt 1 || ( $1 -eq 1 && $2 -lt 95 ) ]]; then
+      missing+=("Rust 1.95 or newer (found: $(rustc --version 2>&1)): rustup update stable")
+    fi
+  fi
   local t
   for t in aarch64-apple-darwin x86_64-apple-darwin; do
     rustup target list --installed 2>/dev/null | grep -qx "$t" \
