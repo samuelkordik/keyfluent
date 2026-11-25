@@ -10,7 +10,13 @@ pub const NAMES: &[&str] = &[
     "two-panes-v",
     "two-panes-v-first",
     "four-panes",
+    "four-panes-row",
+    "five-panes-cols",
+    "five-panes-cols-first",
+    "five-panes-rows",
+    "five-panes-rows-first",
     "three-windows",
+    "five-windows",
 ];
 
 const PROMPT: &str = "user@host:~$ ";
@@ -24,6 +30,11 @@ pub fn get(name: &str) -> Option<Server> {
         "two-panes-v" => two_panes(SplitDir::V, 1),
         "two-panes-v-first" => two_panes(SplitDir::V, 0),
         "four-panes" => four_panes(),
+        "four-panes-row" => four_panes_row(),
+        "five-panes-cols" => five_panes(SplitDir::H, 4, 0),
+        "five-panes-cols-first" => five_panes(SplitDir::H, 0, 1),
+        "five-panes-rows" => five_panes(SplitDir::V, 4, 0),
+        "five-panes-rows-first" => five_panes(SplitDir::V, 0, 1),
         "three-windows" => server(
             vec![
                 one_pane_window(0, "bash", 0, shell()),
@@ -31,6 +42,21 @@ pub fn get(name: &str) -> Option<Server> {
                 one_pane_window(2, "editor", 2, editor()),
             ],
             1,
+            Some(0),
+        ),
+        "five-windows" => server(
+            vec![
+                one_pane_window(0, "bash", 0, shell()),
+                one_pane_window(1, "logs", 1, logs()),
+                Window {
+                    layout: split(SplitDir::V, &[2, 5]),
+                    panes: vec![pane(2, editor()), pane(5, prompt_only())],
+                    ..one_pane_window(2, "editor", 2, editor())
+                },
+                one_pane_window(3, "notes", 3, prompt_only()),
+                one_pane_window(4, "build", 4, prompt_only()),
+            ],
+            2,
             Some(0),
         ),
         _ => return None,
@@ -140,7 +166,8 @@ fn two_panes(dir: SplitDir, active: u32) -> Server {
 }
 
 /// 2×2: p0 top-left, p1 bottom-left, p2 top-right, p3 bottom-right (tmux pane
-/// index order); active = bottom-right, last = top-left.
+/// index order); active = bottom-right, last = top-right (so `o` and `;`
+/// land on different panes).
 fn four_panes() -> Server {
     let window = Window {
         index: 0,
@@ -156,7 +183,57 @@ fn four_panes() -> Server {
             pane(3, prompt_only()),
         ],
         active: PaneId(3),
-        last_active: Some(PaneId(0)),
+        last_active: Some(PaneId(2)),
+        zoomed: false,
+    };
+    server(vec![window], 0, None)
+}
+
+/// Five panes in three columns (`H`) or rows (`V`): the first and last
+/// column/row are split in two (p0 p1 | p2 | p3 p4), the middle one is whole.
+/// From p0 or p4 only one arrow key reaches the middle pane p2: the
+/// opposite arrow wraps to the far side, `o` and `;` go elsewhere.
+fn five_panes(dir: SplitDir, active: u32, last: u32) -> Server {
+    let across = match dir {
+        SplitDir::H => SplitDir::V,
+        SplitDir::V => SplitDir::H,
+    };
+    let window = Window {
+        index: 0,
+        name: "bash".to_owned(),
+        layout: Layout::Split {
+            dir,
+            children: vec![
+                split(across, &[0, 1]),
+                Layout::Pane(PaneId(2)),
+                split(across, &[3, 4]),
+            ],
+        },
+        panes: (0..5)
+            .map(|id| pane(id, if id == 0 { shell() } else { prompt_only() }))
+            .collect(),
+        active: PaneId(active),
+        last_active: Some(PaneId(last)),
+        zoomed: false,
+    };
+    server(vec![window], 0, None)
+}
+
+/// Four panes side by side, p0..p3 left to right; active = p0 (leftmost),
+/// last = p2, so `;` reaches a pane no single move or `o` does.
+fn four_panes_row() -> Server {
+    let window = Window {
+        index: 0,
+        name: "bash".to_owned(),
+        layout: split(SplitDir::H, &[0, 1, 2, 3]),
+        panes: vec![
+            pane(0, shell()),
+            pane(1, prompt_only()),
+            pane(2, prompt_only()),
+            pane(3, prompt_only()),
+        ],
+        active: PaneId(0),
+        last_active: Some(PaneId(2)),
         zoomed: false,
     };
     server(vec![window], 0, None)
@@ -211,7 +288,7 @@ mod tests {
         let four = get("four-panes").unwrap();
         let w = four.sessions[0].current_window().unwrap();
         assert_eq!(w.active, PaneId(3));
-        assert_eq!(w.last_active, Some(PaneId(0)));
+        assert_eq!(w.last_active, Some(PaneId(2)));
         assert_eq!(
             geometry(&w.layout, AREA)[3].1,
             Rect {
@@ -232,6 +309,47 @@ mod tests {
             (three.sessions[0].current, three.sessions[0].last),
             (1, Some(0))
         );
+        let row = get("four-panes-row").unwrap();
+        let w = row.sessions[0].current_window().unwrap();
+        assert_eq!((w.active, w.last_active), (PaneId(0), Some(PaneId(2))));
+        assert_eq!(geometry(&w.layout, AREA).len(), 4);
+        for (name, active, last) in [
+            ("five-panes-cols", 4, 0),
+            ("five-panes-cols-first", 0, 1),
+            ("five-panes-rows", 4, 0),
+            ("five-panes-rows-first", 0, 1),
+        ] {
+            let s = get(name).unwrap();
+            let w = s.sessions[0].current_window().unwrap();
+            assert_eq!(
+                (w.active, w.last_active),
+                (PaneId(active), Some(PaneId(last)))
+            );
+            let order: Vec<PaneId> = geometry(&w.layout, AREA)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect();
+            assert_eq!(order, (0..5).map(PaneId).collect::<Vec<_>>(), "{name}");
+        }
+        let five = &get("five-windows").unwrap().sessions[0];
+        let names: Vec<(u32, &str)> = five
+            .windows
+            .iter()
+            .map(|w| (w.index, w.name.as_str()))
+            .collect();
+        assert_eq!(
+            names,
+            vec![
+                (0, "bash"),
+                (1, "logs"),
+                (2, "editor"),
+                (3, "notes"),
+                (4, "build")
+            ]
+        );
+        assert_eq!((five.current, five.last), (2, Some(0)));
+        // The current window has two panes, so `kill-pane` is not `kill-window`.
+        assert_eq!(five.current_window().unwrap().panes.len(), 2);
         let one = get("one-pane").unwrap();
         assert_eq!(one.sessions[0].windows[0].name, "bash");
         assert_eq!(one.sessions[0].windows[0].panes.len(), 1);

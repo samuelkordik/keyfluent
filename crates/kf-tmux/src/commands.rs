@@ -185,12 +185,12 @@ fn dispatch(server: &mut Server, cmd: &CommandLine) -> Result<Effect, CmdError> 
         "new-window" | "neww" => new_window(server, &parse_args(name, args, "c:dn:")?),
         "select-window" | "selectw" => select_window(server, &parse_args(name, args, "lnpt:")?),
         "next-window" | "next" => {
-            parse_args(name, args, "a")?;
-            step_window(server, true)
+            let args = parse_args(name, args, "a")?;
+            step_window(server, true, args.has('a'))
         }
         "previous-window" | "prev" => {
-            parse_args(name, args, "a")?;
-            step_window(server, false)
+            let args = parse_args(name, args, "a")?;
+            step_window(server, false, args.has('a'))
         }
         "last-window" | "last" => {
             parse_args(name, args, "")?;
@@ -644,7 +644,7 @@ fn select_window(server: &mut Server, args: &Args) -> Result<Effect, CmdError> {
         return last_window(server);
     }
     if args.has('n') || args.has('p') {
-        return step_window(server, args.has('n'));
+        return step_window(server, args.has('n'), false);
     }
     let session = session_mut(server)?;
     let index = match args.value('t') {
@@ -656,11 +656,13 @@ fn select_window(server: &mut Server, args: &Args) -> Result<Effect, CmdError> {
 }
 
 /// `next-window` / `previous-window`: by index, wrapping.
-fn step_window(server: &mut Server, forward: bool) -> Result<Effect, CmdError> {
+/// `next-window` / `previous-window`. With `alert` (`-a`) only windows with
+/// an alert qualify; the model has no alerts, so that always fails.
+fn step_window(server: &mut Server, forward: bool, alert: bool) -> Result<Effect, CmdError> {
     let session = session_mut(server)?;
     let mut indices: Vec<u32> = session.windows.iter().map(|w| w.index).collect();
     indices.sort_unstable();
-    if indices.len() < 2 {
+    if alert || indices.len() < 2 {
         let which = if forward { "next" } else { "previous" };
         server.message = Some(format!("no {which} window"));
         return Ok(Effect::None);
@@ -1025,6 +1027,18 @@ mod tests {
         let mut s = fx("one-pane");
         ok(&mut s, "next");
         assert_eq!(s.message.as_deref(), Some("no next window"));
+    }
+
+    #[test]
+    fn alert_flag_finds_no_window() {
+        // The model has no alerts: `-a` (M-n / M-p) never moves.
+        let mut s = fx("three-windows");
+        ok(&mut s, "next -a");
+        assert_eq!(s.sessions[0].current, 1);
+        assert_eq!(s.message.as_deref(), Some("no next window"));
+        ok(&mut s, "previous-window -a");
+        assert_eq!(s.sessions[0].current, 1);
+        assert_eq!(s.message.as_deref(), Some("no previous window"));
     }
 
     #[test]

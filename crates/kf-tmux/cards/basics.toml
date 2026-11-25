@@ -27,8 +27,8 @@ id = "pane-left"
 category = "panes"
 intent = "Move to the pane on the left"
 teach = "Press Ctrl-b, let go, then press the Left arrow key."
-start = "two-panes-h"
-goal = { active_pane = 0 }
+start = "five-panes-cols"
+goal = { panes = 5, current_window = 0, active_pane = 2 }
 canonical = ["C-b Left"]
 
 [[card]]
@@ -36,8 +36,8 @@ id = "pane-right"
 category = "panes"
 intent = "Move to the pane on the right"
 teach = "Press Ctrl-b, let go, then press the Right arrow key."
-start = "two-panes-h-first"
-goal = { active_pane = 1 }
+start = "five-panes-cols-first"
+goal = { panes = 5, current_window = 0, active_pane = 2 }
 canonical = ["C-b Right"]
 
 [[card]]
@@ -45,8 +45,8 @@ id = "pane-up"
 category = "panes"
 intent = "Move to the pane above"
 teach = "Press Ctrl-b, let go, then press the Up arrow key."
-start = "two-panes-v"
-goal = { active_pane = 0 }
+start = "five-panes-rows"
+goal = { panes = 5, current_window = 0, active_pane = 2 }
 canonical = ["C-b Up"]
 
 [[card]]
@@ -54,8 +54,8 @@ id = "pane-down"
 category = "panes"
 intent = "Move to the pane below"
 teach = "Press Ctrl-b, let go, then press the Down arrow key."
-start = "two-panes-v-first"
-goal = { active_pane = 1 }
+start = "five-panes-rows-first"
+goal = { panes = 5, current_window = 0, active_pane = 2 }
 canonical = ["C-b Down"]
 
 [[card]]
@@ -64,7 +64,7 @@ category = "panes"
 intent = "Move to the next pane"
 teach = "Press Ctrl-b, let go, then press o. Each press moves you on to the next pane in turn."
 start = "four-panes"
-goal = { active_pane = 0 }
+goal = { panes = 4, current_window = 0, active_pane = 0 }
 canonical = ["C-b o"]
 
 [[card]]
@@ -72,8 +72,8 @@ id = "pane-last"
 category = "panes"
 intent = "Jump back to the pane you were just in"
 teach = "Press Ctrl-b, let go, then press ; (semicolon). It takes you back to the pane you used before this one."
-start = "four-panes"
-goal = { active_pane = 0 }
+start = "four-panes-row"
+goal = { panes = 4, current_window = 0, active_pane = 2 }
 canonical = ["C-b ;"]
 
 [[card]]
@@ -91,7 +91,7 @@ category = "panes"
 intent = "Close this pane"
 teach = "Press Ctrl-b, let go, then press x. tmux asks if you are sure: press y for yes."
 start = "two-panes-h"
-goal = { panes = 1 }
+goal = { panes = 1, windows = 1 }
 canonical = ["C-b x", "y"]
 
 # --- Windows -------------------------------------------------------------
@@ -110,8 +110,8 @@ id = "window-next"
 category = "windows"
 intent = "Go to the next window"
 teach = "Press Ctrl-b, let go, then press n for next."
-start = "three-windows"
-goal = { current_window = 2 }
+start = "five-windows"
+goal = { windows = 5, current_window = 3 }
 canonical = ["C-b n"]
 
 [[card]]
@@ -119,26 +119,26 @@ id = "window-prev"
 category = "windows"
 intent = "Go to the previous window"
 teach = "Press Ctrl-b, let go, then press p for previous."
-start = "three-windows"
-goal = { current_window = 0 }
+start = "five-windows"
+goal = { windows = 5, current_window = 1 }
 canonical = ["C-b p"]
 
 [[card]]
 id = "window-select"
 category = "windows"
-intent = "Go to window 2"
-teach = "Press Ctrl-b, let go, then press the window's number, here 2. The numbers are in the bar at the bottom."
-start = "three-windows"
-goal = { current_window = 2 }
-canonical = ["C-b 2"]
+intent = "Go to window 4"
+teach = "Press Ctrl-b, let go, then press the window's number, here 4. The numbers are in the bar at the bottom."
+start = "five-windows"
+goal = { windows = 5, current_window = 4 }
+canonical = ["C-b 4"]
 
 [[card]]
 id = "window-last"
 category = "windows"
 intent = "Jump back to the window you were just in"
 teach = "Press Ctrl-b, let go, then press l for last. It takes you back to the window you used before this one."
-start = "three-windows"
-goal = { current_window = 0 }
+start = "five-windows"
+goal = { windows = 5, current_window = 0 }
 canonical = ["C-b l"]
 
 [[card]]
@@ -155,6 +155,6 @@ id = "window-kill"
 category = "windows"
 intent = "Close this window"
 teach = "Press Ctrl-b, let go, then press &. tmux asks if you are sure: press y for yes."
-start = "three-windows"
-goal = { windows = 2 }
+start = "five-windows"
+goal = { windows = 4 }
 canonical = ["C-b &", "y"]

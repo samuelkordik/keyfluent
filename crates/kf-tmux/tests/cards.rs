@@ -5,6 +5,7 @@
 
 use std::collections::HashSet;
 
+use kf_core::bindings::Binding;
 use kf_core::card::Step;
 use kf_core::key::Key;
 use kf_tmux::{fixtures, pack, stock, Tmux};
@@ -55,7 +56,7 @@ fn expected(id: &str) -> Expect {
         "window-new" => Exact(&["new-window"]),
         "window-next" => Exact(&["next-window"]),
         "window-prev" => Exact(&["previous-window"]),
-        "window-select" => Exact(&["select-window", "-t", ":=2"]),
+        "window-select" => Exact(&["select-window", "-t", ":=4"]),
         "window-last" => Exact(&["last-window"]),
         "window-rename" => Wraps("command-prompt", "rename-window"),
         "window-kill" => Wraps("confirm-before", "kill-window"),
@@ -132,4 +133,77 @@ fn canonical_keys_expand_text() {
         .map(ToString::to_string)
         .collect();
     assert_eq!(keys, ["C-b", ",", "C-u", "l", "o", "g", "s", "Enter"]);
+}
+
+/// The prefix-table key of a card whose route is one binding: `C-b <key>`,
+/// optionally followed by a confirm answer `y`. `None` for longer routes.
+fn single_binding(steps: &[Step]) -> Option<Key> {
+    let prefix: Key = "C-b".parse().unwrap();
+    let y: Key = "y".parse().unwrap();
+    let mut keys = Vec::new();
+    for step in steps {
+        match step {
+            Step::Keys(k) => keys.extend_from_slice(k),
+            Step::Text(_) => return None,
+        }
+    }
+    match keys.as_slice() {
+        [p, k] | [p, k, _] if *p == prefix && keys.get(2).is_none_or(|a| *a == y) => Some(*k),
+        _ => None,
+    }
+}
+
+/// Other bindings that may also solve a card (Ruling 16). Only one kind: on
+/// window-next / window-prev / window-last, the number key of the window you
+/// end up in (`select-window -t :=N`) is a legitimate alternative route, as
+/// every window can be reached by its number. P2's grader caps such a route
+/// at Good and names the key the card practises. No true aliases (two keys
+/// bound to the identical command) exist for the Basics cards.
+fn allowed_alternative(card_id: &str, b: &Binding) -> bool {
+    let number_key = b.commands.first().is_some_and(|c| {
+        matches!(c.0.as_slice(), [cmd, t, target]
+            if cmd == "select-window" && t == "-t" && target.starts_with(":="))
+    });
+    number_key && matches!(card_id, "window-next" | "window-prev" | "window-last")
+}
+
+/// A card must teach its own binding: no other single stock prefix binding,
+/// pressed once from the start state, may reach the goal. A confirm that
+/// opens is answered `y`; a binding that opens an input prompt is skipped;
+/// unsimulated commands fail and leave the state as it was.
+#[test]
+fn no_other_single_binding_solves_a_card() {
+    let tables = stock::tables();
+    let prefix: Key = "C-b".parse().unwrap();
+    let y: Key = "y".parse().unwrap();
+    let mut checked = 0;
+    let mut solved_by = Vec::new();
+    for card in pack::basics().unwrap() {
+        let Some(own) = single_binding(&card.canonical) else {
+            continue;
+        };
+        checked += 1;
+        for b in tables.bindings("prefix") {
+            if b.key == own || allowed_alternative(&card.id, b) {
+                continue;
+            }
+            let mut t = Tmux::new(fixtures::get(&card.start).unwrap(), tables.clone());
+            t.key(&prefix);
+            t.key(&b.key);
+            if t.in_text_entry() {
+                continue;
+            }
+            // Answers a confirm if one opened; otherwise `y` is unbound in root.
+            t.key(&y);
+            if card.goal.met(t.server()) {
+                solved_by.push(format!("{}: C-b {} {:?}", card.id, b.key, b.commands));
+            }
+        }
+    }
+    assert!(
+        solved_by.is_empty(),
+        "cards also solved by another binding:\n{}",
+        solved_by.join("\n")
+    );
+    assert_eq!(checked, 16, "cards with a single-binding route");
 }
