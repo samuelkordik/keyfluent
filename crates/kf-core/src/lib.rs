@@ -1,6 +1,8 @@
 //! Keyfluent core: cards, grading and scheduling. No UI code.
 
 pub mod bindings;
+pub mod card;
+pub mod grid;
 pub mod key;
 
 /// Crate version, shared by the whole workspace.
