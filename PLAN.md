@@ -1,7 +1,7 @@
 # Keyfluent — plan
 
 _2026-11-25. Design: [`docs/superpowers/specs/2026-11-25-keyfluent-design.md`](docs/superpowers/specs/2026-11-25-keyfluent-design.md)
-(awaiting Samuel's approval). Each phase gets a detailed plan in `docs/superpowers/plans/`,
+(approved 2026-11-25; execution: subagent-driven). Each phase gets a detailed plan in `docs/superpowers/plans/`,
 written when the phase starts so it targets the code that exists by then. Dashboard tasks: `kf-*`._
 
 | Phase | Delivers | Plan | Dashboard |

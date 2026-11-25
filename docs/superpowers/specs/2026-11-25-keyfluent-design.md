@@ -1,6 +1,6 @@
 # Keyfluent — design
 
-_2026-11-25. Status: **draft, awaiting Samuel's approval.**_
+_2026-11-25. Status: **approved by Samuel 2026-11-25.**_
 
 Keyfluent is a free, open-source desktop app (Rust + egui; macOS, Windows, Linux) for learning
 keyboard shortcuts by doing. The app shows a **goal**, you press the keys that reach it, and
