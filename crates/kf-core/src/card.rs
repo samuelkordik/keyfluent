@@ -19,12 +19,24 @@ enum RawStep {
     Text { text: String },
 }
 
-impl<'de> Deserialize<'de> for Step {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        match RawStep::deserialize(d)? {
-            RawStep::Keys(s) => parse_keys(&s).map(Step::Keys).map_err(D::Error::custom),
+impl Step {
+    fn from_raw(raw: RawStep) -> Result<Step, KeyParseError> {
+        match raw {
+            RawStep::Keys(s) => {
+                let keys = parse_keys(&s)?;
+                if keys.is_empty() {
+                    return Err(KeyParseError::Empty);
+                }
+                Ok(Step::Keys(keys))
+            }
             RawStep::Text { text } => Ok(Step::Text(text)),
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for Step {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Step::from_raw(RawStep::deserialize(d)?).map_err(D::Error::custom)
     }
 }
 
@@ -96,10 +108,33 @@ struct RawFile {
     card: Vec<toml::Table>,
 }
 
-fn field_err(id: &str, e: toml::de::Error) -> CardError {
-    CardError::Field {
-        id: id.to_string(),
-        reason: e.message().to_string(),
+fn take_string(
+    t: &mut toml::Table,
+    id: &str,
+    name: &str,
+    optional: bool,
+) -> Result<String, CardError> {
+    match t.remove(name) {
+        Some(toml::Value::String(s)) => Ok(s),
+        Some(v) => Err(CardError::Field {
+            id: id.to_string(),
+            reason: format!("field `{name}` must be a string, found {}", v.type_str()),
+        }),
+        None if optional => Ok(String::new()),
+        None => Err(CardError::Field {
+            id: id.to_string(),
+            reason: format!("missing field `{name}`"),
+        }),
+    }
+}
+
+fn take_list(t: &mut toml::Table, id: &str, name: &str) -> Result<Vec<String>, CardError> {
+    match t.remove(name) {
+        None => Ok(Vec::new()),
+        Some(v) => v.try_into().map_err(|e: toml::de::Error| CardError::Field {
+            id: id.to_string(),
+            reason: format!("field `{name}`: {}", e.message()),
+        }),
     }
 }
 
@@ -108,12 +143,12 @@ pub fn load_cards<G: DeserializeOwned>(toml_src: &str) -> Result<Vec<Card<G>>, C
     let file: RawFile = toml::from_str(toml_src).map_err(|e| CardError::Toml(e.to_string()))?;
     let mut seen = HashSet::new();
     let mut out = Vec::with_capacity(file.card.len());
-    for mut t in file.card {
-        let id = match t.get("id") {
-            Some(toml::Value::String(s)) => s.clone(),
+    for (n, mut t) in file.card.into_iter().enumerate() {
+        let id = match t.remove("id") {
+            Some(toml::Value::String(s)) => s,
             _ => {
                 return Err(CardError::Field {
-                    id: String::from("?"),
+                    id: format!("card #{}", n + 1),
                     reason: "missing string field `id`".into(),
                 })
             }
@@ -123,10 +158,16 @@ pub fn load_cards<G: DeserializeOwned>(toml_src: &str) -> Result<Vec<Card<G>>, C
         }
         let steps = match t.remove("canonical") {
             Some(toml::Value::Array(a)) => a,
-            _ => {
+            Some(_) => {
                 return Err(CardError::Field {
                     id,
-                    reason: "missing array field `canonical`".into(),
+                    reason: "field `canonical` must be an array".into(),
+                })
+            }
+            None => {
+                return Err(CardError::Field {
+                    id,
+                    reason: "missing field `canonical`".into(),
                 })
             }
         };
@@ -142,49 +183,35 @@ pub fn load_cards<G: DeserializeOwned>(toml_src: &str) -> Result<Vec<Card<G>>, C
                         e.message()
                     ),
                 })?;
-            canonical.push(match raw {
-                RawStep::Keys(s) => {
-                    Step::Keys(parse_keys(&s).map_err(|source| CardError::BadKey {
-                        id: id.clone(),
-                        step: i,
-                        source,
-                    })?)
-                }
-                RawStep::Text { text } => Step::Text(text),
-            });
+            canonical.push(Step::from_raw(raw).map_err(|source| CardError::BadKey {
+                id: id.clone(),
+                step: i,
+                source,
+            })?);
         }
-        let goal_v = t.remove("goal").ok_or_else(|| CardError::BadGoal {
-            id: id.clone(),
-            reason: "missing".into(),
-        })?;
-        let goal = goal_v
+        let goal = t
+            .remove("goal")
+            .ok_or_else(|| CardError::BadGoal {
+                id: id.clone(),
+                reason: "missing".into(),
+            })?
             .try_into()
             .map_err(|e: toml::de::Error| CardError::BadGoal {
                 id: id.clone(),
                 reason: e.message().to_string(),
             })?;
-        let mut s = |name: &str, optional: bool| -> Result<String, CardError> {
-            match t.remove(name) {
-                Some(toml::Value::String(s)) => Ok(s),
-                None if optional => Ok(String::new()),
-                _ => Err(CardError::Field {
-                    id: id.clone(),
-                    reason: format!("missing string field `{name}`"),
-                }),
-            }
-        };
-        let category = s("category", false)?;
-        let intent = s("intent", false)?;
-        let teach = s("teach", true)?;
-        let start = s("start", false)?;
-        let mut list = |name: &str| -> Result<Vec<String>, CardError> {
-            match t.remove(name) {
-                None => Ok(Vec::new()),
-                Some(v) => v.try_into().map_err(|e| field_err(&id, e)),
-            }
-        };
-        let requires = list("requires")?;
-        let components = list("components")?;
+        let category = take_string(&mut t, &id, "category", false)?;
+        let intent = take_string(&mut t, &id, "intent", false)?;
+        let teach = take_string(&mut t, &id, "teach", true)?;
+        let start = take_string(&mut t, &id, "start", false)?;
+        let requires = take_list(&mut t, &id, "requires")?;
+        let components = take_list(&mut t, &id, "components")?;
+        if let Some(extra) = t.keys().next() {
+            return Err(CardError::Field {
+                reason: format!("unknown field `{extra}`"),
+                id,
+            });
+        }
         out.push(Card {
             id,
             category,
@@ -322,5 +349,65 @@ canonical = ["C-b ,", "BSpace BSpace BSpace BSpace", { text = "logs" }, "Enter"]
         let cards: Vec<Card<toml::Value>> = load_cards(src).unwrap();
         assert_eq!(cards[0].binding_key_count(), 7);
         assert_eq!(cards[0].typed_char_count(), 4);
+    }
+
+    fn card_with(extra: &str) -> String {
+        format!(
+            "[[card]]\nid = \"c\"\ncategory = \"c\"\nintent = \"i\"\nstart = \"s\"\ngoal = {{}}\ncanonical = [\"C-b %\"]\n{extra}\n"
+        )
+    }
+
+    fn err_text(src: &str) -> String {
+        load_cards::<toml::Value>(src).unwrap_err().to_string()
+    }
+
+    #[test]
+    fn bad_requires_type_names_field() {
+        let e = err_text(&card_with("requires = \"split-h\""));
+        assert!(e.contains("\"c\"") && e.contains("`requires`"), "{e}");
+    }
+
+    #[test]
+    fn wrong_type_vs_missing_field() {
+        let src = card_with("").replace("intent = \"i\"", "intent = 5");
+        let e = err_text(&src);
+        assert!(e.contains("`intent` must be a string"), "{e}");
+        let src = card_with("").replace("intent = \"i\"\n", "");
+        let e = err_text(&src);
+        assert!(e.contains("missing field `intent`"), "{e}");
+    }
+
+    #[test]
+    fn empty_key_string_is_error() {
+        let src = card_with("").replace("[\"C-b %\"]", "[\"\"]");
+        let e = load_cards::<toml::Value>(&src).unwrap_err();
+        assert!(matches!(e, CardError::BadKey { .. }), "{e}");
+        assert!(e.to_string().contains("\"c\""));
+    }
+
+    #[test]
+    fn unknown_field_is_rejected() {
+        let e = err_text(&card_with("requries = [\"x\"]"));
+        assert!(e.contains("\"c\"") && e.contains("`requries`"), "{e}");
+    }
+
+    #[test]
+    fn missing_id_reports_position() {
+        let src = format!("{}\n[[card]]\ncategory = \"c\"\n", card_with(""));
+        let e = err_text(&src);
+        assert!(e.contains("card #2"), "{e}");
+    }
+
+    #[test]
+    fn step_deserialize_path() {
+        #[derive(Deserialize)]
+        struct W {
+            s: Vec<Step>,
+        }
+        let w: W = toml::from_str("s = [\"C-b %\", { text = \"ab\" }]").unwrap();
+        assert!(matches!(w.s.first(), Some(Step::Keys(k)) if k.len() == 2));
+        assert_eq!(w.s.get(1), Some(&Step::Text("ab".into())));
+        assert!(toml::from_str::<W>("s = [\"\"]").is_err());
+        assert!(toml::from_str::<W>("s = [{ txt = \"a\" }]").is_err());
     }
 }
