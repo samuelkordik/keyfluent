@@ -2,7 +2,9 @@
 
 pub mod commands;
 pub mod fixtures;
+pub mod goal;
 pub mod layout;
+pub mod pack;
 pub mod prompt;
 pub mod render;
 pub mod sim;

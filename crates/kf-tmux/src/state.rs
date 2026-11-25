@@ -13,7 +13,9 @@ pub struct Pane {
 }
 
 /// Split direction. `H` = side by side (`split-window -h`), `V` = stacked.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// Card files spell it `"h"` / `"v"`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum SplitDir {
     H,
     V,
