@@ -1,3 +1,3 @@
 //! Keyfluent tmux pack.
 
-pub use kf_core::VERSION;
+pub mod stock;

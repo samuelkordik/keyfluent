@@ -247,10 +247,19 @@ mod tests {
     fn round_trips() {
         for s in [
             "C-b", "%", "\"", "Space", "Enter", "Escape", "S-Up", "C-Up", "M-1", "PPage", "F5",
-            "B", "#", "C-o",
+            "B", "#", "C-o", "M-C-b", "C-Space", "M-Up", "S-Down",
         ] {
             assert_eq!(s.parse::<Key>().unwrap().to_string(), s);
         }
+    }
+
+    #[test]
+    fn modifier_order_normalises() {
+        assert_eq!("C-M-b".parse::<Key>().unwrap().to_string(), "M-C-b");
+        assert_eq!(
+            "C-M-b".parse::<Key>().unwrap(),
+            "M-C-b".parse::<Key>().unwrap()
+        );
     }
 
     #[test]
