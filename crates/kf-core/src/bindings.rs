@@ -227,6 +227,13 @@ pub fn parse_block(token: &str) -> Option<Vec<CommandLine>> {
     split_commands(tokenize(inner).ok()?).ok()
 }
 
+/// Parse a typed command line (as at tmux's `:` prompt) into commands, with
+/// the same rules as `list-keys` bindings: `;` / `\;` separate commands and
+/// `{ … }` blocks stay one argument.
+pub fn parse_command_line(line: &str) -> Result<Vec<CommandLine>, ParseWarningKind> {
+    split_commands(tokenize(line)?)
+}
+
 /// Mouse keys (`MouseDown1Pane`, `M-WheelUpStatus`, …): the simulator is
 /// keyboard-only, so these are skipped without a warning.
 fn is_mouse_key(name: &str) -> bool {
@@ -557,6 +564,29 @@ bind-key -T root M-b if-shell -F "#{x}" { send-keys -M } { copy-mode -H ; send-k
     }
 
     #[test]
+    fn parses_typed_command_lines() {
+        assert_eq!(
+            parse_command_line("splitw -h").unwrap(),
+            vec![CommandLine(vec!["splitw".into(), "-h".into()])]
+        );
+        assert_eq!(
+            parse_command_line("renamew 'my logs' ; selectp -L").unwrap(),
+            vec![
+                CommandLine(vec!["renamew".into(), "my logs".into()]),
+                CommandLine(vec!["selectp".into(), "-L".into()]),
+            ]
+        );
+        assert_eq!(
+            parse_command_line("   "),
+            Err(ParseWarningKind::MissingCommand)
+        );
+        assert_eq!(
+            parse_command_line("renamew \"open"),
+            Err(ParseWarningKind::UnterminatedQuote)
+        );
+    }
+
+    #[test]
     fn garbage_does_not_panic() {
         for s in [
             "\\",
@@ -579,6 +609,7 @@ bind-key -T root M-b if-shell -F "#{x}" { send-keys -M } { copy-mode -H ; send-k
         ] {
             let _ = parse_list_keys(s);
             let _ = parse_block(s);
+            let _ = parse_command_line(s);
         }
     }
 }
