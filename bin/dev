@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Run a command (default: interactive bash) inside the keyfluent toolchain container.
+#   bin/dev                 -> shell
+#   bin/dev cargo build     -> one-off command
+#   bin/dev cargo test      -> run the tests
+set -euo pipefail
+cd "$(dirname "$0")/.."
+docker compose up -d dev >/dev/null
+if [ $# -eq 0 ]; then exec docker compose exec dev bash; fi
+if [ -t 0 ]; then exec docker compose exec dev "$@"; else exec docker compose exec -T dev "$@"; fi

@@ -1,0 +1,15 @@
+services:
+  dev:
+    build:
+      context: docker
+      args: { USER_UID: "1000", USER_GID: "1000" }
+    image: keyfluent-dev:latest
+    container_name: keyfluent-dev
+    volumes:
+      - .:/workspace
+      - cargo-registry:/opt/rust/cargo/registry
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+volumes:
+  cargo-registry:
