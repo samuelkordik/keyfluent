@@ -5,5 +5,4 @@
 
 2026-11-25: **P1 (core + tmux simulator) is done** on branch `p1-core-tmux`, with 17 Basics cards.
 
-**Next:** Mac round 1 is pending. Run the key probe on a Mac (`MAC_AGENT.md`) and record
-which keys reach the app. Lessons and the tmux simulator come after that.
+**Next:** P2 (grading, FSRS scheduling, storage), then the egui practice screens in P3.

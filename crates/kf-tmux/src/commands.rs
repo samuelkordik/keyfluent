@@ -655,9 +655,9 @@ fn select_window(server: &mut Server, args: &Args) -> Result<Effect, CmdError> {
     Ok(Effect::None)
 }
 
-/// `next-window` / `previous-window`: by index, wrapping.
-/// `next-window` / `previous-window`. With `alert` (`-a`) only windows with
-/// an alert qualify; the model has no alerts, so that always fails.
+/// `next-window` / `previous-window`: by index, wrapping. With `alert`
+/// (`-a`) only windows with an alert qualify; the model has no alerts, so
+/// that always fails.
 fn step_window(server: &mut Server, forward: bool, alert: bool) -> Result<Effect, CmdError> {
     let session = session_mut(server)?;
     let mut indices: Vec<u32> = session.windows.iter().map(|w| w.index).collect();

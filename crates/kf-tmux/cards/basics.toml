@@ -8,7 +8,7 @@
 id = "split-h"
 category = "panes"
 intent = "Split this pane side by side"
-teach = "Press the prefix, Ctrl-b, let go, then press %. Think of % as two circles side by side."
+teach = "Press the prefix, Ctrl-b, let go, then press % (Shift-5 on most keyboards). Think of % as two circles side by side."
 start = "one-pane"
 goal = { panes = 2, split = "h" }
 canonical = ["C-b %"]
@@ -17,7 +17,7 @@ canonical = ["C-b %"]
 id = "split-v"
 category = "panes"
 intent = "Split this pane into top and bottom"
-teach = 'Press Ctrl-b, let go, then press ". Think of the two marks in " as one pane stacked over another.'
+teach = "Press the prefix, Ctrl-b, let go, then press \" (the double-quote key: Shift and ' on most keyboards). The new pane appears below."
 start = "one-pane"
 goal = { panes = 2, split = "v" }
 canonical = ['C-b "']
