@@ -56,6 +56,8 @@ pub enum KeyParseError {
     Unknown(String),
     #[error("S- only applies to named keys, not {0:?}")]
     ShiftOnChar(String),
+    #[error("no key types the character {0:?}")]
+    Untypeable(char),
 }
 
 const NAMES: [(&str, NamedKey); 16] = [
@@ -189,6 +191,57 @@ impl fmt::Display for Key {
 }
 
 impl Key {
+    /// A plain key with no modifiers.
+    fn plain(base: KeyBase) -> Key {
+        Key {
+            base,
+            ctrl: false,
+            meta: false,
+            shift: false,
+        }
+    }
+
+    /// The key that types `c`: `' '` is `Space`, `'\t'` is `Tab`, `'\n'` and
+    /// `'\r'` are `Enter`, a printable character is itself. `None` for other
+    /// control characters and other whitespace (no key notation names them).
+    pub fn from_char(c: char) -> Option<Key> {
+        let base = match c {
+            ' ' => KeyBase::Named(NamedKey::Space),
+            '\t' => KeyBase::Named(NamedKey::Tab),
+            '\n' | '\r' => KeyBase::Named(NamedKey::Enter),
+            c if c.is_control() || c.is_whitespace() => return None,
+            c => KeyBase::Char(c),
+        };
+        Some(Key::plain(base))
+    }
+
+    /// The same key in the form [`FromStr`] produces, so keys from any source
+    /// compare equal to parsed ones: `shift` on a character is folded into it
+    /// (shift + `b` is `B`; dropped for non-letters, whose case the character
+    /// already carries), `ctrl` with an ASCII letter lower-cases it (`C-B` is
+    /// `C-b`), and the character `' '` becomes `Space`. Named keys keep `shift`.
+    pub fn normalized(self) -> Key {
+        let KeyBase::Char(mut c) = self.base else {
+            return self;
+        };
+        if self.shift {
+            c = c.to_ascii_uppercase();
+        }
+        if self.ctrl {
+            c = c.to_ascii_lowercase();
+        }
+        let base = if c == ' ' {
+            KeyBase::Named(NamedKey::Space)
+        } else {
+            KeyBase::Char(c)
+        };
+        Key {
+            base,
+            shift: false,
+            ..self
+        }
+    }
+
     /// Beginner-friendly keycap labels, e.g. `["Ctrl", "b"]`, `["Shift", "↑"]`,
     /// `["Page Up"]`. Meta is shown as `Alt` (the app relabels per platform).
     /// An upper-case ASCII letter shows as `["Shift", "b"]`.
@@ -297,6 +350,44 @@ mod tests {
         assert_eq!("C--".parse::<Key>().unwrap().to_string(), "C--");
         assert!("F13".parse::<Key>().is_err());
         assert!("S-a".parse::<Key>().is_err());
+    }
+
+    #[test]
+    fn from_char() {
+        let k = |s: &str| Some(s.parse::<Key>().unwrap());
+        assert_eq!(Key::from_char(' '), k("Space"));
+        assert_eq!(Key::from_char('\t'), k("Tab"));
+        assert_eq!(Key::from_char('\n'), k("Enter"));
+        assert_eq!(Key::from_char('\r'), k("Enter"));
+        assert_eq!(Key::from_char('a'), k("a"));
+        assert_eq!(Key::from_char('%'), k("%"));
+        assert_eq!(Key::from_char('é'), k("é"));
+        for c in ['\u{0}', '\u{1b}', '\u{7f}', '\u{a0}'] {
+            assert_eq!(Key::from_char(c), None, "{c:?}");
+        }
+    }
+
+    #[test]
+    fn normalized_matches_parsing() {
+        let raw = |base, ctrl, shift| Key {
+            base,
+            ctrl,
+            meta: false,
+            shift,
+        };
+        let k = |s: &str| s.parse::<Key>().unwrap();
+        let c = KeyBase::Char;
+        assert_eq!(raw(c('B'), true, false).normalized(), k("C-b"));
+        assert_eq!(raw(c('b'), false, true).normalized(), k("B"));
+        assert_eq!(raw(c('b'), true, true).normalized(), k("C-b"));
+        assert_eq!(raw(c('%'), false, true).normalized(), k("%"));
+        assert_eq!(raw(c(' '), false, false).normalized(), k("Space"));
+        assert_eq!(raw(c(' '), true, false).normalized(), k("C-Space"));
+        let up = raw(KeyBase::Named(NamedKey::Up), false, true);
+        assert_eq!(up.normalized(), k("S-Up"));
+        for s in ["C-b", "B", "%", "M-C-b", "Space", "S-Up", "é"] {
+            assert_eq!(k(s).normalized(), k(s), "{s}");
+        }
     }
 
     #[test]

@@ -5,7 +5,9 @@ use serde::de::{DeserializeOwned, Deserializer, Error as _};
 use serde::Deserialize;
 use std::collections::HashSet;
 
-/// One step of a canonical answer: binding keys, or literal typed text.
+/// One step of a canonical answer: binding keys, or literal typed text. Every
+/// character of a `Text` step has a key ([`Key::from_char`]); loading rejects
+/// other control characters.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Step {
     Keys(Vec<Key>),
@@ -29,7 +31,10 @@ impl Step {
                 }
                 Ok(Step::Keys(keys))
             }
-            RawStep::Text { text } => Ok(Step::Text(text)),
+            RawStep::Text { text } => match text.chars().find(|c| Key::from_char(*c).is_none()) {
+                Some(c) => Err(KeyParseError::Untypeable(c)),
+                None => Ok(Step::Text(text)),
+            },
         }
     }
 }
@@ -396,6 +401,17 @@ canonical = ["C-b ,", "BSpace BSpace BSpace BSpace", { text = "logs" }, "Enter"]
         let src = format!("{}\n[[card]]\ncategory = \"c\"\n", card_with(""));
         let e = err_text(&src);
         assert!(e.contains("card #2"), "{e}");
+    }
+
+    #[test]
+    fn untypeable_text_is_rejected_naming_card() {
+        let src = card_with("").replace("[\"C-b %\"]", "[\"C-b ,\", { text = \"a\\u001bb\" }]");
+        let e = load_cards::<toml::Value>(&src).unwrap_err();
+        assert!(matches!(e, CardError::BadKey { step: 1, .. }), "{e}");
+        assert!(e.to_string().contains("\"c\""), "{e}");
+        // Tabs and newlines are typeable (Tab, Enter).
+        let src = card_with("").replace("[\"C-b %\"]", "[{ text = \"a\\tb\\n\" }]");
+        assert!(load_cards::<toml::Value>(&src).is_ok());
     }
 
     #[test]
