@@ -6,10 +6,10 @@ use std::time::Duration;
 use kf_core::bindings::{Binding, CommandLine, KeyTables};
 use kf_core::grid::CellGrid;
 use kf_core::key::{Key, KeyBase};
-use kf_core::KeyOutcome;
+use kf_core::{KeyOutcome, RanBinding};
 
-use crate::commands::{run, Effect};
-use crate::prompt::{Prompt, PromptStep};
+use crate::commands::{run, Effect, PANE_AREA};
+use crate::prompt::{inserts_text, Prompt, PromptStep};
 use crate::render::{render, Overlay};
 use crate::state::Server;
 
@@ -93,7 +93,7 @@ impl Tmux {
         self.now = now;
         self.server.message = None;
         if let Some(prompt) = self.prompt.as_mut() {
-            let text_entry = !matches!(prompt, Prompt::Confirm { .. });
+            let text_entry = matches!(prompt, Prompt::Input { .. }) && inserts_text(k);
             match prompt.key(k) {
                 PromptStep::Open => {}
                 PromptStep::Closed => self.prompt = None,
@@ -106,14 +106,22 @@ impl Tmux {
                     self.server.message = Some(message);
                 }
             }
-            return KeyOutcome { text_entry };
+            return KeyOutcome {
+                text_entry,
+                ran: None,
+            };
         }
         if self.prefix_pending {
             self.prefix_pending = false;
-            if let Some(b) = self.tables.lookup("prefix", k).cloned() {
-                self.run_binding(&b);
-            }
-            return KeyOutcome::default();
+            let ran = self
+                .tables
+                .lookup("prefix", k)
+                .cloned()
+                .map(|b| self.run_binding(&b));
+            return KeyOutcome {
+                text_entry: false,
+                ran,
+            };
         }
         if let Some(r) = self.repeat.take() {
             let repeated = (now.saturating_sub(r.since) < REPEAT_TIME)
@@ -122,26 +130,43 @@ impl Tmux {
                 .filter(|b| b.repeat)
                 .cloned();
             if let Some(b) = repeated {
-                self.run_binding(&b);
-                return KeyOutcome::default();
+                return KeyOutcome {
+                    text_entry: false,
+                    ran: Some(self.run_binding(&b)),
+                };
             }
             // Repeat is over: the key is handled as a fresh one.
         }
+        let mut ran = None;
         if *k == self.prefix_key {
             self.prefix_pending = true;
         } else if let Some(b) = self.tables.lookup("root", k).cloned() {
-            self.run_binding(&b);
+            ran = Some(self.run_binding(&b));
         }
-        KeyOutcome::default()
+        KeyOutcome {
+            text_entry: false,
+            ran,
+        }
     }
 
-    fn run_binding(&mut self, binding: &Binding) {
+    /// Runs `binding` and describes it for the [`KeyOutcome`].
+    fn run_binding(&mut self, binding: &Binding) -> RanBinding {
         self.run_commands(&binding.commands);
         if binding.repeat && self.prompt.is_none() {
             self.repeat = Some(Repeat {
                 table: binding.table.clone(),
                 since: self.now,
             });
+        }
+        RanBinding {
+            table: binding.table.clone(),
+            key: binding.key,
+            command: binding
+                .commands
+                .first()
+                .and_then(|c| c.0.first())
+                .cloned()
+                .unwrap_or_default(),
         }
     }
 
@@ -161,14 +186,16 @@ impl Tmux {
     }
 
     /// The client's view (window, status line, prefix indicator, prompt or
-    /// message) in a `cols` × `rows` grid. The model itself stays 80×24; the
-    /// app scales the grid rather than resizing tmux.
-    pub fn grid(&self, cols: u16, rows: u16) -> CellGrid {
+    /// message) as an 80×24 grid: the model is a fixed 80×24 terminal
+    /// (Ruling 13), and the app scales the grid rather than resizing tmux.
+    pub fn grid(&self) -> CellGrid {
         let overlay = Overlay {
             prefix_pending: self.prefix_pending,
             prompt: self.prompt.as_ref().map(Prompt::status),
             message: self.server.message.clone(),
         };
+        // PANE_AREA plus the status line.
+        let (cols, rows) = (PANE_AREA.w, PANE_AREA.h.saturating_add(1));
         render(&self.server, &overlay, cols, rows)
     }
 
@@ -262,14 +289,67 @@ mod tests {
         let mut t = tmux("one-pane");
         press(&mut t, "C-b ,");
         assert!(t.in_text_entry());
-        assert!(t
-            .grid(80, 24)
-            .row_text(23)
-            .starts_with("(rename-window) bash"));
+        assert!(t.grid().row_text(23).starts_with("(rename-window) bash"));
         let typed = press(&mut t, "C-u l o g s Enter");
-        assert!(typed.iter().all(|o| o.text_entry));
+        let entry: Vec<bool> = typed.iter().map(|o| o.text_entry).collect();
+        // Ruling 17: only inserted characters are text entry.
+        assert_eq!(entry, [false, true, true, true, true, false]);
+        assert!(typed.iter().all(|o| o.ran.is_none()));
         assert!(!t.in_text_entry());
         assert_eq!(win(&t).name, "logs");
+    }
+
+    #[test]
+    fn prompt_editing_keys_are_not_text_entry() {
+        for k in ["BSpace", "C-u", "Enter", "Escape", "C-c"] {
+            let mut t = tmux("one-pane");
+            press(&mut t, "C-b ,");
+            assert!(!t.key(&key(k)).text_entry, "{k}");
+        }
+        let mut t = tmux("one-pane");
+        press(&mut t, "C-b ,");
+        assert!(t.key(&key("Space")).text_entry);
+    }
+
+    #[test]
+    fn outcome_reports_the_binding_that_ran() {
+        let mut t = tmux("one-pane");
+        let out = press(&mut t, "C-b %");
+        assert_eq!(out[0].ran, None);
+        assert_eq!(
+            out[1].ran,
+            Some(RanBinding {
+                table: "prefix".into(),
+                key: key("%"),
+                command: "split-window".into(),
+            })
+        );
+        // Unbound keys and the prefix key itself report nothing.
+        assert!(press(&mut t, "C-b k a").iter().all(|o| o.ran.is_none()));
+    }
+
+    #[test]
+    fn outcome_reports_root_bindings() {
+        let (tables, _) =
+            kf_core::bindings::parse_list_keys("bind-key -T root M-v split-window -h\n");
+        let mut t = Tmux::new(fixtures::get("one-pane").unwrap(), tables);
+        let ran = t.key(&key("M-v")).ran.unwrap();
+        assert_eq!(
+            (ran.table.as_str(), ran.command.as_str()),
+            ("root", "split-window")
+        );
+    }
+
+    #[test]
+    fn outcome_reports_repeated_binding() {
+        let mut t = tmux("four-panes");
+        t.key_at(&key("C-b"), Duration::from_millis(1000));
+        t.key_at(&key("Up"), Duration::from_millis(1100));
+        let out = t.key_at(&key("Up"), Duration::from_millis(1300));
+        let ran = out.ran.unwrap();
+        assert_eq!(ran.table, "prefix");
+        assert_eq!(ran.key, key("Up"));
+        assert_eq!(ran.command, "select-pane");
     }
 
     #[test]
@@ -295,17 +375,14 @@ mod tests {
         let mut t = tmux("two-panes-h");
         press(&mut t, "C-b x");
         assert!(!t.in_text_entry());
-        assert!(t
-            .grid(80, 24)
-            .row_text(23)
-            .starts_with("kill-pane 1? (y/n)"));
+        assert!(t.grid().row_text(23).starts_with("kill-pane 1? (y/n)"));
         assert!(!press(&mut t, "y")[0].text_entry);
         assert_eq!(win(&t).panes.len(), 1);
 
         let mut t = tmux("two-panes-h");
         press(&mut t, "C-b x");
         assert!(!press(&mut t, "n")[0].text_entry);
-        assert!(t.grid(80, 24).row_text(23).starts_with("[0] "));
+        assert!(t.grid().row_text(23).starts_with("[0] "));
         assert_eq!(win(&t).panes.len(), 2);
     }
 
@@ -313,10 +390,12 @@ mod tests {
     fn command_prompt_runs_typed_command() {
         let mut t = tmux("one-pane");
         assert!(press(&mut t, "C-b :").iter().all(|o| !o.text_entry));
-        assert!(t.grid(80, 24).row_text(23).starts_with(':'));
+        assert!(t.grid().row_text(23).starts_with(':'));
         let typed = press(&mut t, "s p l i t w Space - h Enter");
         assert_eq!(typed.len(), 10);
-        assert!(typed.iter().all(|o| o.text_entry));
+        let (enter, chars) = typed.split_last().unwrap();
+        assert!(chars.iter().all(|o| o.text_entry));
+        assert!(!enter.text_entry);
         assert_eq!(win(&t).panes.len(), 2);
         assert!(matches!(
             win(&t).layout,
@@ -332,10 +411,7 @@ mod tests {
         let mut t = tmux("one-pane");
         press(&mut t, "C-b : f o o Enter");
         assert_eq!(t.server().message.as_deref(), Some("unknown command: foo"));
-        assert!(t
-            .grid(80, 24)
-            .row_text(23)
-            .starts_with("unknown command: foo"));
+        assert!(t.grid().row_text(23).starts_with("unknown command: foo"));
         // The next key press clears the message.
         press(&mut t, "a");
         assert_eq!(t.server().message, None);
@@ -352,7 +428,7 @@ mod tests {
         assert_eq!(win(&t).panes.len(), 1);
         let mut t = tmux("three-windows");
         press(&mut t, "C-b : c o n f i r m Space k i l l w Enter");
-        assert!(t.grid(80, 24).row_text(23).starts_with("Confirm 'killw'?"));
+        assert!(t.grid().row_text(23).starts_with("Confirm 'killw'?"));
         press(&mut t, "y");
         assert_eq!(t.server().sessions[0].windows.len(), 2);
     }
@@ -405,11 +481,17 @@ mod tests {
     }
 
     #[test]
+    fn grid_is_80_by_24() {
+        let g = tmux("one-pane").grid();
+        assert_eq!((g.cols, g.rows), (80, 24));
+    }
+
+    #[test]
     fn grid_shows_prefix_indicator() {
         let mut t = tmux("one-pane");
-        assert!(!t.grid(80, 24).row_text(23).contains("^B"));
+        assert!(!t.grid().row_text(23).contains("^B"));
         press(&mut t, "C-b");
-        assert!(t.grid(80, 24).row_text(23).contains("^B"));
+        assert!(t.grid().row_text(23).contains("^B"));
     }
 
     #[test]
@@ -419,7 +501,7 @@ mod tests {
         assert_eq!(t.server().attached, None);
         press(&mut t, "C-b % C-b : s p l i t w Enter a");
         assert_eq!(t.server().attached, None);
-        assert_eq!(t.grid(80, 24).row_text(0).trim_end(), "[exited]");
+        assert_eq!(t.grid().row_text(0).trim_end(), "[exited]");
     }
 
     #[test]
@@ -443,7 +525,7 @@ mod tests {
             for (i, _) in keys.iter().enumerate() {
                 for k in keys.iter().skip(i).chain(keys.iter().take(i)) {
                     t.key(k);
-                    let _ = t.grid(80, 24);
+                    let _ = t.grid();
                 }
             }
         }

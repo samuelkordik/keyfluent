@@ -73,12 +73,11 @@ impl Prompt {
             Prompt::Input {
                 input, template, ..
             } => match (k.base, k.ctrl, k.meta) {
-                (KeyBase::Char(c), false, false) if !c.is_control() => {
-                    input.push(c);
-                    PromptStep::Open
-                }
-                (KeyBase::Named(NamedKey::Space), false, false) => {
-                    input.push(' ');
+                _ if inserts_text(k) => {
+                    input.push(match k.base {
+                        KeyBase::Char(c) => c,
+                        KeyBase::Named(_) => ' ',
+                    });
                     PromptStep::Open
                 }
                 (KeyBase::Named(NamedKey::BSpace), false, false) => {
@@ -96,6 +95,19 @@ impl Prompt {
                 _ => PromptStep::Open,
             },
         }
+    }
+}
+
+/// The key inserts a character into an input prompt: a printable character
+/// without `C-`/`M-`, or `Space`. These are the only text-entry keys
+/// (Ruling 17); editing, submit and cancel keys count as binding keys.
+pub fn inserts_text(k: &Key) -> bool {
+    if k.ctrl || k.meta {
+        return false;
+    }
+    match k.base {
+        KeyBase::Char(c) => !c.is_control(),
+        KeyBase::Named(n) => n == NamedKey::Space,
     }
 }
 

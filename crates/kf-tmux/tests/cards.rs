@@ -207,3 +207,18 @@ fn no_other_single_binding_solves_a_card() {
     );
     assert_eq!(checked, 16, "cards with a single-binding route");
 }
+
+/// The simulator and `Card::binding_key_count` agree on which canonical keys
+/// are binding keys (text_entry = false): prompt editing/submit keys and
+/// confirm answers count, inserted characters don't (Rulings 14 and 17).
+#[test]
+fn binding_key_count_matches_simulator() {
+    for card in pack::basics().unwrap() {
+        let mut t = Tmux::new(fixtures::get(&card.start).unwrap(), stock::tables().clone());
+        let binding_keys = pack::canonical_keys(&card)
+            .iter()
+            .filter(|k| !t.key(k).text_entry)
+            .count();
+        assert_eq!(binding_keys, card.binding_key_count(), "{}", card.id);
+    }
+}
