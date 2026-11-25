@@ -1,0 +1,24 @@
+[package]
+name = "kf-app"
+description = "Keyfluent: learn keyboard shortcuts by doing."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+eframe = "0.37.0"
+kf-core = { version = "0.1.0", path = "../kf-core" }
+kf-tmux = { version = "0.1.0", path = "../kf-tmux" }
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "keyfluent"
+path = "src/main.rs"

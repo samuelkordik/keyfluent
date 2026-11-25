@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+members = ["crates/kf-core", "crates/kf-tmux", "crates/kf-app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Samuel Kordik"]
+repository = "https://github.com/samuelkordik/keyfluent"
+rust-version = "1.85"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+indexing_slicing = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
