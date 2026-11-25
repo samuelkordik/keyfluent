@@ -154,7 +154,7 @@ canonical = ["C-b ,", "C-u", { text = "logs" }, "Enter"]
 id = "window-kill"
 category = "windows"
 intent = "Close this window"
-teach = "Press Ctrl-b, let go, then press &. tmux asks if you are sure: press y for yes."
+teach = "Press Ctrl-b, let go, then press & (Shift-7 on most keyboards). tmux asks if you are sure: press y for yes."
 start = "five-windows"
 goal = { windows = 4 }
 canonical = ["C-b &", "y"]
