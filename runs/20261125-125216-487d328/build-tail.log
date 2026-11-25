@@ -1,0 +1,161 @@
+== Tools
+== Tests (cargo test --workspace)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 19.55s
+     Running unittests src/lib.rs (target/debug/deps/kf_app-d9c956a7d376aa1f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/keyfluent-2ed2fc05ad9995ee)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/probe.rs (target/debug/deps/probe-f21cc864604f0c17)
+
+running 2 tests
+test describes_ctrl_b_and_percent ... ok
+test probe_logs_typed_text ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests src/lib.rs (target/debug/deps/kf_core-ed239d10e05789b1)
+
+running 1 test
+test tests::version_is_set ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/kf_tmux-07690fb37eeac89b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests kf_app
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests kf_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests kf_tmux
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+== Build app (universal)
+    Finished `release` profile [optimized] target(s) in 4.21s
+   Compiling objc2-foundation v0.3.2
+   Compiling zerocopy v0.8.65
+   Compiling png v0.18.1
+   Compiling read-fonts v0.41.0
+   Compiling fearless_simd v0.4.1
+   Compiling icu_locale_core v2.4.0
+   Compiling icu_collections v2.4.0
+   Compiling dispatch v0.2.0
+   Compiling core-foundation-sys v0.8.7
+   Compiling accesskit v0.25.2
+   Compiling ahash v0.8.13
+   Compiling unicode-general-category v1.1.0
+   Compiling objc2-foundation v0.2.2
+   Compiling core-foundation v0.9.4
+   Compiling icu_properties_data v2.4.0
+   Compiling icu_normalizer_data v2.4.0
+   Compiling wgpu-types v30.0.2
+   Compiling emath v0.37.0
+   Compiling bitflags v1.3.2
+   Compiling foreign-types-shared v0.3.1
+   Compiling foreign-types v0.5.0
+   Compiling core-graphics-types v0.1.3
+   Compiling wgpu-hal v30.0.2
+   Compiling libloading v0.8.9
+   Compiling ecolor v0.37.0
+   Compiling self_cell v1.3.0
+   Compiling unicode-properties v0.1.5
+   Compiling epaint_default_fonts v0.37.0
+   Compiling icu_provider v2.4.0
+   Compiling zune-core v0.5.3
+   Compiling tracing-core v0.1.36
+   Compiling icu_normalizer v2.4.0
+   Compiling icu_properties v2.4.0
+   Compiling nohash-hasher v0.2.0
+   Compiling unicode-segmentation v1.13.3
+   Compiling pin-project-lite v0.2.18
+   Compiling zune-jpeg v0.5.15
+   Compiling tracing v0.1.44
+   Compiling winit v0.30.13
+   Compiling core-graphics v0.23.2
+   Compiling cursor-icon v1.2.0
+   Compiling either v1.19.0
+   Compiling percent-encoding v2.3.2
+   Compiling quick-error v2.0.1
+   Compiling smol_str v0.2.2
+   Compiling dpi v0.1.2
+   Compiling weezl v0.1.12
+   Compiling fax v0.2.7
+   Compiling pxfm v0.1.30
+   Compiling itertools v0.15.0
+   Compiling idna_adapter v1.2.2
+   Compiling form_urlencoded v1.2.3
+   Compiling idna v1.1.0
+   Compiling wgpu-core v30.0.2
+   Compiling accesskit_consumer v0.39.2
+   Compiling byteorder-lite v0.1.0
+   Compiling wgpu v30.0.2
+   Compiling url v2.5.9
+   Compiling memmap2 v0.9.12
+   Compiling objc2-core-text v0.3.2
+   Compiling objc2-app-kit v0.2.2
+   Compiling half v2.7.1
+   Compiling objc2-metal v0.3.2
+   Compiling vello_common v0.2.0
+   Compiling naga v30.0.2
+   Compiling tiff v0.11.3
+   Compiling objc2-app-kit v0.3.2
+   Compiling parlance v0.1.1
+   Compiling web-time v1.1.0
+   Compiling rustc-hash v2.1.3
+   Compiling moxcms v0.8.1
+   Compiling type-map v0.5.1
+   Compiling poll-promise v0.3.0
+   Compiling sys-locale v0.3.2
+   Compiling unicode-script v0.5.9
+   Compiling kf-core v0.1.0 (<repo>/crates/kf-core)
+   Compiling pollster v1.0.3
+   Compiling kf-tmux v0.1.0 (<repo>/crates/kf-tmux)
+   Compiling skrifa v0.44.0
+   Compiling harfrust v0.12.0
+   Compiling fontique v0.11.1
+   Compiling objc2-quartz-core v0.3.2
+   Compiling accesskit_macos v0.27.2
+   Compiling raw-window-metal v1.1.0
+   Compiling webbrowser v1.2.7
+   Compiling image v0.25.10
+   Compiling accesskit_winit v0.34.2
+   Compiling glifo v0.3.0
+   Compiling vello_cpu v0.2.0
+   Compiling arboard v3.7.0
+   Compiling epaint v0.37.0
+   Compiling wgpu-naga-bridge v30.0.2
+   Compiling egui v0.37.0
+   Compiling egui_system_font_provider v0.37.0
+   Compiling wgpu-core-deps-apple v30.0.2
+   Compiling egui-winit v0.37.0
+   Compiling egui-wgpu v0.37.0
+   Compiling eframe v0.37.0
+   Compiling kf-app v0.1.0 (<repo>/crates/kf-app)
+    Finished `release` profile [optimized] target(s) in 3m 52s
+Entitlements (sandboxed; no network):
+com.apple.security.app-sandbox
+Signature OK
+Architectures in the fat file: dist/Keyfluent.app/Contents/MacOS/Keyfluent are: x86_64 arm64 
+Built dist/Keyfluent.app (v0.1.0, unsigned/ad-hoc). Launch with: open dist/Keyfluent.app

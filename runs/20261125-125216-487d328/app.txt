@@ -1,0 +1,4 @@
+lipo: x86_64 arm64 
+entitlements: com.apple.security.app-sandbox 
+signature: ok
+size:  24M
