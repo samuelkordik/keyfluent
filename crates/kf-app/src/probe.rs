@@ -4,36 +4,46 @@ use eframe::egui;
 
 const MAX_LINES: usize = 40;
 
-/// Describes a Key or Text event; `None` for every other event.
+/// Describes a Key, Text, Copy, Cut, Paste or Ime event; `None` for every other event.
 pub fn describe(event: &egui::Event) -> Option<String> {
     match event {
         egui::Event::Key {
             key,
+            physical_key,
             pressed,
+            repeat,
             modifiers,
-            ..
         } => Some(format!(
-            "Key {key:?} pressed={pressed} mods={}",
+            "Key {key:?} pressed={pressed} repeat={repeat} physical={physical_key:?} mods={}",
             describe_mods(*modifiers)
         )),
         egui::Event::Text(text) => Some(format!("Text {text:?}")),
+        egui::Event::Copy => Some("Copy".to_owned()),
+        egui::Event::Cut => Some("Cut".to_owned()),
+        egui::Event::Paste(text) => Some(format!("Paste {text:?}")),
+        egui::Event::Ime(ime) => Some(format!("Ime {ime:?}")),
         _ => None,
     }
 }
 
+/// Raw modifier flags. `command` is skipped: on Linux/Windows it mirrors `ctrl`.
 fn describe_mods(m: egui::Modifiers) -> String {
     let flags = [
         (m.ctrl, "C"),
         (m.alt, "M"),
         (m.shift, "S"),
-        (m.command, "Cmd"),
+        (m.mac_cmd, "Cmd"),
     ];
-    flags
+    let names: Vec<&str> = flags
         .iter()
         .filter(|(on, _)| *on)
         .map(|(_, name)| *name)
-        .collect::<Vec<_>>()
-        .join("+")
+        .collect();
+    if names.is_empty() {
+        "-".to_owned()
+    } else {
+        names.join("+")
+    }
 }
 
 /// App that shows the last events it received.
