@@ -74,6 +74,13 @@ impl CellGrid {
         }
     }
 
+    /// Writes one cell at (x, y); out-of-range positions are ignored. Never panics.
+    pub fn put_char(&mut self, x: u16, y: u16, ch: char, role: StyleRole) {
+        if let Some(cell) = self.index(x, y).and_then(|i| self.cells.get_mut(i)) {
+            *cell = Cell { ch, role };
+        }
+    }
+
     /// The characters of row `y` (empty if out of range).
     pub fn row_text(&self, y: u16) -> String {
         (0..self.cols)
@@ -103,6 +110,24 @@ mod tests {
         g.put_str(u16::MAX, 0, "xyz", StyleRole::Dim);
         assert_eq!(g.row_text(0), "    ");
         assert_eq!(g.row_text(5), "");
+    }
+
+    #[test]
+    fn put_char_writes_one_cell_and_clips() {
+        let mut g = CellGrid::new(3, 2);
+        g.put_char(2, 1, '│', StyleRole::ActiveBorder);
+        assert_eq!(
+            g.get(2, 1),
+            Some(&Cell {
+                ch: '│',
+                role: StyleRole::ActiveBorder
+            })
+        );
+        g.put_char(3, 1, 'x', StyleRole::Normal);
+        g.put_char(0, 2, 'x', StyleRole::Normal);
+        g.put_char(u16::MAX, u16::MAX, 'x', StyleRole::Normal);
+        assert_eq!(g.row_text(0), "   ");
+        assert_eq!(g.row_text(1), "  │");
     }
 
     #[test]
