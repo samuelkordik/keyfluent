@@ -1,6 +1,6 @@
 //! tmux commands that change panes and windows.
 
-use kf_core::bindings::{parse_block, CommandLine};
+use kf_core::bindings::{parse_block, parse_command_line, CommandLine};
 use thiserror::Error;
 
 use crate::layout::{geometry, neighbour_wrapping, Dir, Rect};
@@ -378,12 +378,17 @@ fn expand(text: &str, server: &Server) -> String {
     out
 }
 
-/// A `{ … }` block argument read as commands, or the words as one command.
+/// The command argument of `confirm-before` / `command-prompt` read as
+/// commands: a `{ … }` block, a single word holding a whole command line
+/// (tmux ≤ 3.0 style, e.g. `"rename-window -- '%%'"`), or the words as one
+/// command.
 fn command_list(words: &[String]) -> Result<Vec<CommandLine>, CmdError> {
     match words {
         [] => Ok(Vec::new()),
         [block] if block.starts_with('{') => parse_block(block)
             .ok_or_else(|| CmdError::BadArgs(format!("bad command block: {block}"))),
+        [line] => parse_command_line(line)
+            .map_err(|e| CmdError::BadArgs(format!("bad command {line:?}: {e}"))),
         _ => Ok(vec![CommandLine(words.to_vec())]),
     }
 }

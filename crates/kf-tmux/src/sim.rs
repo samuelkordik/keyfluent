@@ -487,6 +487,17 @@ mod tests {
     }
 
     #[test]
+    fn rename_with_tmux_3_0a_template() {
+        let (tables, _) = kf_core::bindings::parse_list_keys(include_str!(
+            "../../../reference/tmux-3.0a-list-keys.txt"
+        ));
+        let mut t = Tmux::new(fixtures::get("one-pane").unwrap(), tables);
+        press(&mut t, "C-b , C-u l o g s Enter");
+        assert_eq!(t.server().message, None);
+        assert_eq!(win(&t).name, "logs");
+    }
+
+    #[test]
     fn grid_shows_prefix_indicator() {
         let mut t = tmux("one-pane");
         assert!(!t.grid().row_text(23).contains("^B"));
