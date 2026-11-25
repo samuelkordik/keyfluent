@@ -45,4 +45,34 @@ None.
 
 ## Key probe (hands-on)
 
-_Not yet recorded. Add it as described in MAC_AGENT.md, then run `scripts/mac/verify.sh --publish-run out/mac/20261125-125216-487d328`._
+Layout: **U.S.** Keys pressed one at a time, in this order, on a fresh launch (`--key-probe`).
+Keyboard is a compact one without a PgUp key, so PgUp was not tested. Probe lists newest first;
+rows below are in press order. Screenshot: `hands-on/probe.png`.
+
+| Key pressed | Probe shows | Notes |
+|---|---|---|
+| `Ctrl-b` | ControlLeft down; `Key B` down/up `mods=C`; ControlLeft up | OK. No `Text` event. |
+| `%` | ShiftLeft down; `Key Num5` down `mods=S`; `Text "%"`; Num5 up; ShiftLeft up | OK. Logical key is `Num5`, text carries `%`. |
+| `"` | ShiftLeft down; `Key Quote` down `mods=S`; `Text "\""`; Quote up; ShiftLeft up | OK. Logical key `Quote`, text `"`. |
+| `Shift-Up` | ShiftLeft down; `Key ArrowUp` down/up `mods=S`; ShiftLeft up | OK. |
+| `Ctrl-Up` | ControlLeft down/up only, **no ArrowUp** | Swallowed by macOS (Mission Control default). |
+| (unexpected) | `Key F5` down/up `mods=-` | Appeared between Ctrl-Up and Esc in both attempts; not one of the keys pressed. Source unknown (possibly the compact keyboard or a system shortcut side effect). |
+| `Esc` | `Key Escape` down/up `mods=-` | OK. |
+| `Option-1` | AltLeft down; `Key I` down `mods=M`, `physical=Some(I)`; `Text "¡"` (renders like `i` at screenshot resolution); I up; AltLeft up | **Wrong key.** Expected `Num1` / physical `Digit1`. egui reports logical *and* physical `I`, apparently derived from the produced character `¡`. |
+| `PgUp` | — | Not tested (no PgUp on keyboard). |
+| `Space` | `Key Space` down; `Text " "`; Space up `mods=-` | OK. |
+| `Enter` | `Key Enter` down/up `mods=-` | OK. No `Text` event. |
+| `Cmd-Shift-P` | SuperLeft down; ShiftLeft down `mods=Cmd`; `Key P` down/up `mods=S+Cmd`; ShiftLeft up; SuperLeft up | OK. No `Text` event. |
+
+## Findings
+
+- **Option+digit is misreported.** `Option-1` arrives as `Key I` with `physical=Some(I)` plus text
+  `¡`. Physical key should be `Digit1`. Any card using `M-1`..`M-9` (e.g. tmux `select-layout`
+  presets) can't be matched on the logical key; matching needs the physical key, and egui's
+  physical key also looks wrong here. Worth checking how eframe/winit fills `physical_key` on macOS
+  for Option-modified keys, and whether to fall back to raw keycodes.
+- **Ctrl-Up never reaches the app** (Mission Control). Cards that use `C-Up` need a note or an
+  alternative binding on macOS.
+- **Stray F5** appeared after Ctrl-Up in both runs; unexplained, recorded as observed.
+- Modifier-press events carry the modifier set *before* the change (e.g. ShiftLeft down shows
+  `mods=-`, ShiftLeft up shows `mods=S`); expected for egui but matters for matching logic.
