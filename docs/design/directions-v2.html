@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design directions, round 2 — Keyfluent</title>
+<!-- ux-plan round 2: four takes on direction C (Boot screen). Local fonts in ./fonts (not committed). -->
+<style>
+  @font-face { font-family: "Argon";   src: url("fonts/Monaspace Argon Var.ttf");   font-weight: 200 800; font-stretch: 100% 125%; }
+  @font-face { font-family: "Neon";    src: url("fonts/Monaspace Neon Var.ttf");    font-weight: 200 800; font-stretch: 100% 125%; }
+  @font-face { font-family: "Xenon";   src: url("fonts/Monaspace Xenon Var.ttf");   font-weight: 200 800; font-stretch: 100% 125%; }
+  @font-face { font-family: "Radon";   src: url("fonts/Monaspace Radon Var.ttf");   font-weight: 200 800; font-stretch: 100% 125%; }
+  @font-face { font-family: "Krypton"; src: url("fonts/Monaspace Krypton Var.ttf"); font-weight: 200 800; font-stretch: 100% 125%; }
+  @font-face { font-family: "Inconsolata"; src: url("fonts/Inconsolata.ttf"); font-weight: 200 900; font-stretch: 50% 200%; }
+  @font-face { font-family: "Source Code Pro"; src: url("fonts/SourceCodePro.ttf"); font-weight: 200 900; }
+  @font-face { font-family: "Fira Code"; src: url("fonts/FiraCode.ttf"); font-weight: 300 700; }
+
+  /* Tomorrow Night Bright (default) */
+  :root, .t-bright { --bg:#000000; --line:#2a2a2a; --sel:#424242; --fg:#eaeaea; --comment:#969896;
+    --red:#d54e53; --orange:#e78c45; --yellow:#e7c547; --green:#b9ca4a; --aqua:#70c0b1; --blue:#7aa6da; --purple:#c397d8; }
+  /* Tomorrow Night Eighties */
+  .t-eighties { --bg:#2d2d2d; --line:#393939; --sel:#515151; --fg:#cccccc; --comment:#999999;
+    --red:#f2777a; --orange:#f99157; --yellow:#ffcc66; --green:#99cc99; --aqua:#66cccc; --blue:#6699cc; --purple:#cc99cc; }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 "Argon", monospace; background: #141414; color: #eaeaea; }
+  header.sheet { padding: 24px 32px 8px; max-width: 1440px; }
+  header.sheet h1 { font: 800 24px/1.2 "Krypton", monospace; font-stretch: 125%; margin: 0 0 8px; letter-spacing: .03em; }
+  header.sheet p { margin: 0 0 6px; color: #969896; max-width: 110ch; }
+  header.sheet ul { margin: 4px 0 0; padding-left: 20px; color: #969896; max-width: 110ch; }
+  main { padding: 8px 32px 40px; display: grid; gap: 28px; max-width: 1440px; }
+
+  .dir { border: 1px solid #424242; background: #0a0a0a; display: grid; grid-template-columns: 320px 1fr; }
+  .dir > .notes { padding: 18px 20px; border-right: 1px solid #424242; font-size: 13px; }
+  .notes h2 { margin: 0 0 6px; font: 800 19px/1.2 "Krypton", monospace; font-stretch: 125%; letter-spacing: .03em; }
+  .notes .concept { margin: 0 0 10px; }
+  .notes dt { color: #969896; margin-top: 8px; } .notes dd { margin: 0; }
+  .notes .wild { display: inline-block; background: #c397d8; color: #000; padding: 0 6px; font-weight: 700; margin-bottom: 6px; }
+  .dir > .shots { padding: 18px 20px; display: grid; grid-template-columns: 640px 1fr; gap: 18px; align-items: start; }
+  .cap { font-size: 12px; color: #969896; margin: 0 0 6px; }
+
+  /* ---------- shared components ---------- */
+  .screen { background: var(--bg); color: var(--fg); border: 1px solid var(--sel); overflow: hidden; font: 13px/1.4 "Argon", monospace; position: relative; }
+  .K { font-family: "Krypton", monospace; font-weight: 800; font-stretch: 125%; text-transform: uppercase; letter-spacing: .03em; }
+  .R { font-family: "Radon", monospace; }
+  .muted { color: var(--comment); }
+  fieldset { border: 1px solid var(--comment); margin: 0; padding: 4px 6px 6px; min-width: 0; }
+  legend { padding: 0 6px; color: var(--fg); }
+  .term { display: flex; flex-direction: column; min-height: 170px; }
+  .term pre { margin: 0; padding: 4px 6px; font: inherit; flex: 1; white-space: pre; overflow: hidden; }
+  .term .status { background: var(--green); color: #000; display: flex; justify-content: space-between; padding: 0 6px; white-space: pre; }
+  .p { color: var(--green); } .d { color: var(--blue); } .cur { background: var(--fg); color: var(--bg); }
+  .goalpic { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--comment); height: 84px; margin-top: 4px; }
+  .goalpic div + div { border-left: 1px solid var(--green); outline: 1px solid var(--green); outline-offset: -1px; }
+  .row2 { display: grid; grid-template-columns: 1fr 170px; gap: 8px; }
+  .kk { color: #000; background: var(--fg); padding: 0 4px; }
+  .dots { color: var(--green); letter-spacing: .12em; }
+  .dots .now { color: var(--fg); } .dots .todo { color: var(--sel); } .dots .miss { color: var(--red); }
+  .fbar { display: flex; gap: 14px; padding: 2px 8px; background: var(--line); white-space: pre; font-size: 12px; }
+  .fbar b { background: var(--blue); color: #000; font-weight: 400; padding: 0 3px; }
+  .fbar .r { margin-left: auto; }
+  .stripe { display: grid; grid-template-columns: repeat(6, 1fr); height: 6px; }
+  .stripe i:nth-child(1){background:var(--red)} .stripe i:nth-child(2){background:var(--orange)} .stripe i:nth-child(3){background:var(--yellow)}
+  .stripe i:nth-child(4){background:var(--green)} .stripe i:nth-child(5){background:var(--aqua)} .stripe i:nth-child(6){background:var(--blue)}
+  .intent { font-size: 26px; line-height: 1.15; margin: 4px 0 8px; }
+  .pad { padding: 10px 14px; display: grid; gap: 8px; }
+  .between { display: flex; justify-content: space-between; align-items: baseline; }
+
+  /* ---------- 1 Arcade cabinet ---------- */
+  .v1 .hud { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .v1 .hud div { display: grid; }
+  .v1 .hud .lbl { font-size: 10px; color: var(--red); }
+  .v1 .hud .val { font-size: 16px; }
+  .v1 .flash { border: 1px solid var(--green); padding: 6px 10px; display: flex; gap: 18px; align-items: baseline; }
+  .v1 .flash .g { font-size: 24px; color: var(--green); }
+  .v1 .nb { color: #000; background: var(--yellow); padding: 0 6px; font-weight: 700; }
+  .v1 table { border-collapse: collapse; width: 100%; }
+  .v1 td { padding: 2px 4px; } .v1 td.n { text-align: right; }
+
+  /* ---------- 2 Home computer ---------- */
+  .v2 .bezel { padding: 22px; background: var(--blue); }
+  .v2 .bezel.win { background: repeating-linear-gradient(0deg, var(--green) 0 7px, #000 7px 11px, var(--yellow) 11px 16px, #000 16px 19px); }
+  .v2 .inner { background: var(--bg); }
+  .v2 .boot { padding: 14px 18px; font-size: 15px; line-height: 1.55; text-transform: uppercase; color: var(--blue); min-height: 230px; }
+  .v2 .boot .c { text-align: center; }
+  .v2 .boot .hi { color: var(--fg); }
+
+  /* ---------- 3 Cartridge ---------- */
+  .v3 .stars { color: var(--yellow); letter-spacing: .1em; font-size: 18px; }
+  .v3 .stars .off { color: var(--sel); }
+  .v3 .chip { color: #000; padding: 0 6px; font-weight: 700; }
+  .v3 .sel { display: grid; gap: 10px; padding: 12px 14px; }
+  .v3 .cat { display: grid; grid-template-columns: 112px 1fr; gap: 8px; align-items: center; }
+  .v3 .tiles { display: flex; gap: 4px; flex-wrap: wrap; }
+  .v3 .tile { width: 26px; height: 26px; display: grid; place-items: center; font-size: 11px; border: 1px solid var(--sel); }
+  .v3 .tile.m { background: var(--green); color: #000; } .v3 .tile.y { background: var(--aqua); color: #000; }
+  .v3 .tile.l { background: var(--yellow); color: #000; } .v3 .tile.n { color: var(--comment); }
+  .v3 .tile.lock { color: var(--sel); border-style: dashed; }
+  .v3 .legend { display: flex; gap: 12px; font-size: 11px; color: var(--comment); }
+  .v3 .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; vertical-align: -1px; }
+
+  /* ---------- 4 Cracktro ---------- */
+  .v4 .crack { position: relative; height: 330px; background: #000; overflow: hidden; }
+  .v4 .stars-bg { position: absolute; inset: 0; background-image:
+      radial-gradient(1px 1px at 20px 30px, #eaeaea, transparent), radial-gradient(1px 1px at 140px 80px, #969896, transparent),
+      radial-gradient(1px 1px at 260px 20px, #eaeaea, transparent), radial-gradient(1px 1px at 330px 140px, #969896, transparent),
+      radial-gradient(1px 1px at 90px 200px, #eaeaea, transparent), radial-gradient(1px 1px at 400px 260px, #969896, transparent),
+      radial-gradient(1px 1px at 180px 300px, #eaeaea, transparent), radial-gradient(1px 1px at 520px 90px, #eaeaea, transparent),
+      radial-gradient(1px 1px at 600px 230px, #969896, transparent), radial-gradient(1px 1px at 470px 190px, #eaeaea, transparent); }
+  .v4 .raster { position: absolute; left: 0; right: 0; height: 18px; }
+  .v4 .logo { position: absolute; top: 72px; left: 0; right: 0; text-align: center; font-size: 40px; }
+  .v4 .logo span { display: inline-block; }
+  .v4 .menu { position: absolute; top: 150px; left: 0; right: 0; text-align: center; line-height: 1.8; font-size: 14px; }
+  .v4 .menu .on { background: var(--fg); color: #000; padding: 0 8px; }
+  .v4 .scroller { position: absolute; bottom: 14px; left: 0; white-space: nowrap; font-size: 18px; color: var(--yellow); }
+  .v4 .scroller span { display: inline-block; }
+  .v4 .sweep { background: linear-gradient(180deg, var(--bg), color-mix(in oklab, var(--green) 35%, var(--bg)) 40%, color-mix(in oklab, var(--green) 35%, var(--bg)) 60%, var(--bg)); text-align: center; padding: 10px 0; }
+  .v4 .sweep .g { font-size: 26px; color: var(--green); }
+
+  /* ---------- shared fonts strip ---------- */
+  .shared { border: 1px solid #424242; background: #0a0a0a; padding: 18px 20px; }
+  .shared h2 { margin: 0 0 8px; font: 800 19px "Krypton", monospace; font-stretch: 125%; letter-spacing: .03em; }
+  .shared p, .shared li { color: #969896; font-size: 13px; max-width: 120ch; }
+  .fonts { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; margin: 10px 0; }
+  .fonts div { border: 1px solid #424242; padding: 8px 10px; }
+  .fonts .fn { color: #969896; font: 11px "Argon", monospace; }
+  .fonts .spec { font-size: 16px; line-height: 1.3; }
+</style>
+</head>
+<body>
+<header class="sheet">
+  <h1>Keyfluent: round 2</h1>
+  <p>Four takes on C · Boot screen. All four use all-caps Krypton for display text, Argon for body and the terminal, and Radon for teaching notes. They all keep A's function-key bar, its box-titled panels (terminal, goal) and its progress dots. The theme colors the whole app. Versions 1, 2 and 4 use Tomorrow Night Bright; version 3 uses Tomorrow Night Eighties, to show that a theme recolors everything.</p>
+  <p>Fun features shared by all four (feel like play, never homework):</p>
+  <ul>
+    <li>A score line after every card: the grade word, your time against the target, and the shortest route if yours was longer.</li>
+    <li><b>New best</b> when you beat your own record on a card.</li>
+    <li>A <b>combo</b> count for correct answers in a row. It ends quietly, with no "you broke it" message.</li>
+    <li>An end-of-session summary.</li>
+    <li>Practice days shown as "days this month", never as a streak you can lose.</li>
+    <li>Scenarios unlock as bonus rounds once their cards are solid.</li>
+  </ul>
+</header>
+<main>
+
+<!-- ================= 1 ================= -->
+<section class="dir v1">
+  <div class="notes">
+    <h2>1 · Arcade cabinet</h2>
+    <p class="concept">C, tightened. An arcade HUD across the top: card, combo, your best, the target. The result flash is a score line; the session ends on a results table.</p>
+    <dl>
+      <dt>Layout</dt><dd>Stripe, HUD, intent, terminal + goal panels, dots, F-key bar. Today is a title screen; Progress and Preferences are full screens (F3, F4)</dd>
+      <dt>Color</dt><dd>Each category owns one accent (Basics blue, Copy mode green, Sessions purple, Layout orange). HUD labels in red, like arcade score labels</dd>
+      <dt>Motion</dt><dd>The score counts up on the result flash; the stripe pulses on a new best. Both are off with reduced motion</dd>
+      <dt>Signature</dt><dd>The HUD and the end-of-session results table</dd>
+      <dt>Risk</dt><dd>The HUD adds a row of numbers to read during practice. The HUD can be hidden in Preferences</dd>
+    </dl>
+  </div>
+  <div class="shots">
+    <div>
+      <p class="cap">Practice: result flash after a correct answer (1000 × 700)</p>
+      <div class="screen">
+        <div class="stripe"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="pad">
+          <div class="hud">
+            <div><span class="lbl K">Card</span><span class="val">03 / 17</span></div>
+            <div><span class="lbl K">Combo</span><span class="val">×4</span></div>
+            <div><span class="lbl K">Your best</span><span class="val">1.4 s</span></div>
+            <div><span class="lbl K">Target</span><span class="val">2.0 s</span></div>
+          </div>
+          <div class="intent K">Split this pane side by side</div>
+          <div class="row2">
+            <fieldset><legend> terminal </legend><div class="term">
+<pre>you@laptop:~/site$ git status   │<span class="p">you@laptop</span>:<span class="d">~/site</span>$ <span class="cur"> </span>
+On branch main                  │
+nothing to commit, working tree │
+<span class="p">you@laptop</span>:<span class="d">~/site</span>$                │</pre>
+              <div class="status"><span>[0] 0:bash*</span><span>"laptop" 14:02</span></div></div></fieldset>
+            <fieldset><legend> goal </legend><div class="goalpic"><div></div><div></div></div><p class="R muted" style="margin:6px 0 0;color:var(--yellow)">Prefix, then % for a side-by-side split.</p></fieldset>
+          </div>
+          <div class="flash"><span class="g K">Good ✓</span><span>1.6 s / target 2.0 s</span><span class="nb">NEW BEST</span><span class="muted" style="margin-left:auto">Enter: next</span></div>
+          <div class="between"><span>keys <span class="kk">Ctrl</span>+<span class="kk">b</span> <span class="kk">%</span></span><span class="dots">●●<span class="now">●</span><span class="todo">○○○○○○○○○○○○○○</span></span></div>
+        </div>
+        <div class="fbar"><span><b>⌃⇧P</b> Pause</span><span>Show me</span><span class="r">every other key goes to tmux</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="cap">Session complete</p>
+      <div class="screen">
+        <div class="stripe"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="pad">
+          <div class="K" style="font-size:20px">Session complete</div>
+          <table>
+            <tr><td class="K" style="color:var(--aqua)">Easy</td><td class="n">6</td><td class="K" style="color:var(--green)">Good</td><td class="n">8</td></tr>
+            <tr><td class="K" style="color:var(--yellow)">Hard</td><td class="n">2</td><td class="K" style="color:var(--red)">Again</td><td class="n">1</td></tr>
+          </table>
+          <div class="muted">Best combo ×9 · 6 min 42 s</div>
+          <div><span class="K" style="color:var(--yellow)">New bests</span></div>
+          <table>
+            <tr><td>Split side by side</td><td class="n">1.4 s</td></tr>
+            <tr><td>Next window</td><td class="n">0.9 s</td></tr>
+            <tr><td>Zoom this pane</td><td class="n">1.1 s</td></tr>
+          </table>
+          <div class="muted">Next reviews: 4 tomorrow</div>
+        </div>
+        <div class="fbar"><span><b>⏎</b> Done</span><span><b>F3</b> Progress</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 2 ================= -->
+<section class="dir v2">
+  <div class="notes">
+    <h2>2 · Home computer</h2>
+    <p class="concept">The window is an 8-bit micro's screen: a thick colored border around the work area, uppercase system text, and "READY." on the Today screen.</p>
+    <dl>
+      <dt>Layout</dt><dd>A 22 px border around everything. Inside: the same practice layout as version 1, without the HUD</dd>
+      <dt>Color</dt><dd>The border takes the category's color. On a correct answer it flashes loading-stripes (a static flash with reduced motion); on a miss it turns red with the word "Again"</dd>
+      <dt>Copy voice</dt><dd>System lines in caps ("12 REVIEWS DUE"); cards and teaching notes in normal case, for readability</dd>
+      <dt>Signature</dt><dd>The border: you see whether you got it right from the edge of your eye, without reading</dd>
+      <dt>Risk</dt><dd>The flashing stripes are intense. They are limited to under 3 flashes a second (WCAG 2.3.1) and can be turned off. The border also costs 44 px of width</dd>
+    </dl>
+  </div>
+  <div class="shots">
+    <div>
+      <p class="cap">Practice: the moment of success (border stripes)</p>
+      <div class="screen">
+        <div class="bezel win"><div class="inner">
+          <div class="pad">
+            <div class="between muted"><span class="K" style="font-size:11px;color:var(--blue)">Basics</span><span>3 / 17</span></div>
+            <div class="intent K" style="font-size:22px">Split this pane side by side</div>
+            <div class="row2" style="grid-template-columns:1fr 150px">
+              <fieldset><legend> terminal </legend><div class="term" style="min-height:140px">
+<pre><span class="p">you@laptop</span>:<span class="d">~/site</span>$       │<span class="p">you@laptop</span>:<span class="d">~/site</span>$ <span class="cur"> </span>
+                         │</pre>
+                <div class="status"><span>[0] 0:bash*</span><span>14:02</span></div></div></fieldset>
+              <fieldset><legend> goal </legend><div class="goalpic" style="height:70px"><div></div><div></div></div></fieldset>
+            </div>
+            <div class="between"><span class="K" style="color:var(--green);font-size:18px">Good ✓ <span style="font:400 13px Argon;text-transform:none;letter-spacing:0">1.6 s / 2.0 s</span></span><span class="dots">●●<span class="now">●</span><span class="todo">○○○○○○○○○○○○○○</span></span></div>
+          </div>
+          <div class="fbar"><span><b>⌃⇧P</b> Pause</span><span>Show me</span><span class="r">every other key goes to tmux</span></div>
+        </div></div>
+      </div>
+    </div>
+    <div>
+      <p class="cap">Today (boot screen)</p>
+      <div class="screen">
+        <div class="bezel"><div class="inner">
+          <div class="boot">
+            <div class="c hi">**** KEYFLUENT V0.1 ****</div>
+            <div class="c">TMUX PACK · PREFIX CTRL-B</div>
+            <br>
+            <div class="hi">12 REVIEWS DUE</div>
+            <div class="hi">5 NEW CARDS</div>
+            <div>8 DAYS THIS MONTH</div>
+            <br>
+            <div>READY.</div>
+            <div class="hi">PRESS ENTER TO START<span class="cur"> </span></div>
+          </div>
+          <div class="fbar"><span><b>F3</b> Progress</span><span><b>F4</b> Prefs</span><span><b>F1</b> About</span></div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 3 ================= -->
+<section class="dir v3 t-eighties">
+  <div class="notes">
+    <h2>3 · Cartridge</h2>
+    <p class="concept">16-bit console era. Stars per card, and the Progress page as a stage-select grid: every card is a tile, colored by how well you know it.</p>
+    <dl>
+      <dt>Stars = ratings</dt><dd>The FSRS grade, shown as stars: Again ☆☆☆, Hard ★☆☆, Good ★★☆, Easy ★★★. Each card keeps your best stars</dd>
+      <dt>Progress</dt><dd>The spec's mastery heatmap becomes the stage select: rows per category, a tile per card (new, learning, young, mature). Select a tile to see its times and practice that card. Scenarios show as locked bonus tiles until their cards are solid</dd>
+      <dt>Color</dt><dd>Mastery bands carry the color; tiles also carry a letter or ★, so color is never the only signal</dd>
+      <dt>Signature</dt><dd>Stars and the stage-select grid: progress you can see filling in</dd>
+      <dt>Risk</dt><dd>Stars are the most overtly game-like element in this round. It works only if they map honestly to the grades (they do: 0–3 stars = the four FSRS ratings)</dd>
+    </dl>
+  </div>
+  <div class="shots">
+    <div>
+      <p class="cap">Practice: result (theme: Tomorrow Night Eighties)</p>
+      <div class="screen">
+        <div class="stripe"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="pad">
+          <div class="between muted"><span><span class="chip K" style="background:var(--blue);font-size:11px">Basics</span> card 3 of 17</span><span>combo ×4</span></div>
+          <div class="intent K">Split this pane side by side</div>
+          <div class="row2">
+            <fieldset><legend> terminal </legend><div class="term">
+<pre><span class="p">you@laptop</span>:<span class="d">~/site</span>$ git status   │<span class="p">you@laptop</span>:<span class="d">~/site</span>$ <span class="cur"> </span>
+On branch main                  │
+nothing to commit, working tree │</pre>
+              <div class="status"><span>[0] 0:bash*</span><span>"laptop" 14:02</span></div></div></fieldset>
+            <fieldset><legend> goal </legend><div class="goalpic"><div></div><div></div></div></fieldset>
+          </div>
+          <div class="between"><span><span class="stars">★★<span class="off">☆</span></span> <span class="K" style="color:var(--green);font-size:18px">Good</span> 1.6 s / target 2.0 s</span><span class="muted">Easy at under 2.0 s</span></div>
+          <div class="between"><span>keys <span class="kk">Ctrl</span>+<span class="kk">b</span> <span class="kk">%</span></span><span class="dots">●●<span class="now">●</span><span class="todo">○○○○○○○○○○○○○○</span></span></div>
+        </div>
+        <div class="fbar"><span><b>⌃⇧P</b> Pause</span><span>Show me</span><span class="r">every other key goes to tmux</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="cap">Progress (stage select)</p>
+      <div class="screen">
+        <div class="sel">
+          <div class="K" style="font-size:18px">Progress</div>
+          <div class="cat"><span class="K" style="color:var(--blue);font-size:11px">Basics</span><div class="tiles"><span class="tile m">★</span><span class="tile m">★</span><span class="tile y">Y</span><span class="tile y">Y</span><span class="tile l">L</span><span class="tile l">L</span><span class="tile n">·</span><span class="tile n">·</span><span class="tile lock">?</span></div></div>
+          <div class="cat"><span class="K" style="color:var(--green);font-size:11px">Copy mode</span><div class="tiles"><span class="tile l">L</span><span class="tile n">·</span><span class="tile n">·</span><span class="tile n">·</span><span class="tile n">·</span><span class="tile n">·</span><span class="tile lock">?</span></div></div>
+          <div class="cat"><span class="K" style="color:var(--purple);font-size:11px">Sessions</span><div class="tiles"><span class="tile n">·</span><span class="tile n">·</span><span class="tile n">·</span><span class="tile n">·</span><span class="tile lock">?</span></div></div>
+          <div class="legend"><span><i style="background:var(--green)"></i>mature</span><span><i style="background:var(--aqua)"></i>young</span><span><i style="background:var(--yellow)"></i>learning</span><span>· new</span><span>? bonus</span></div>
+          <div class="muted" style="font-size:12px">Split side by side · best 1.4 s ★★★ · next review in 9 days</div>
+        </div>
+        <div class="fbar"><span><b>⏎</b> Practice card</span><span><b>F2</b> Today</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 4 ================= -->
+<section class="dir v4">
+  <div class="notes">
+    <span class="wild">Out there</span>
+    <h2>4 · Cracktro</h2>
+    <p class="concept">The Today screen is a demoscene intro: raster bars, a sine-wave logo, a starfield, and a scrolling message that carries tips and the credits. Practice itself stays calm.</p>
+    <dl>
+      <dt>Today</dt><dd>Raster bars in the theme's six accents. The logo waves. The menu sits in the middle. The bottom scroller loops tips ("The prefix is Ctrl-b…") and greetings to the theme and font authors (the About credits, scene-style)</dd>
+      <dt>Practice</dt><dd>Same layout as version 1. On success, a raster bar sweeps once across the window behind the grade word</dd>
+      <dt>Session end</dt><dd>An "end part": the summary scrolls past over the starfield; any key returns to Today</dd>
+      <dt>Optional extra</dt><dd>Short chiptune sounds for correct, new best and session end (off by default, a Preferences switch)</dd>
+      <dt>Signature</dt><dd>The app opens with a show. Nobody forgets it</dd>
+      <dt>Risk</dt><dd>Heavy motion: with reduced motion everything is still (bars static, logo flat, scroller becomes a line of text). The Today screen redraws every frame, so it costs CPU while open; it can pause when the window is in the background</dd>
+    </dl>
+  </div>
+  <div class="shots">
+    <div>
+      <p class="cap">Today (one frame of the animation)</p>
+      <div class="screen">
+        <div class="crack">
+          <div class="stars-bg"></div>
+          <div class="raster" style="top:22px;background:linear-gradient(180deg,#000,var(--red),#000)"></div>
+          <div class="raster" style="top:40px;background:linear-gradient(180deg,#000,var(--orange),#000)"></div>
+          <div class="raster" style="top:58px;background:linear-gradient(180deg,#000,var(--yellow),#000)"></div>
+          <div class="logo K"><span style="transform:translateY(-6px)">K</span><span style="transform:translateY(-10px)">E</span><span style="transform:translateY(-8px)">Y</span><span style="transform:translateY(-2px)">F</span><span style="transform:translateY(4px)">L</span><span style="transform:translateY(8px)">U</span><span style="transform:translateY(9px)">E</span><span style="transform:translateY(5px)">N</span><span style="transform:translateY(-1px)">T</span></div>
+          <div class="menu"><div class="muted">tmux pack · prefix Ctrl-b · 12 due · 5 new</div><div><span class="on">▶ Start practice</span></div><div>Progress</div><div>Preferences</div></div>
+          <div class="raster" style="top:262px;background:linear-gradient(180deg,#000,var(--aqua),#000)"></div>
+          <div class="raster" style="top:280px;background:linear-gradient(180deg,#000,var(--blue),#000)"></div>
+          <div class="scroller K"><span style="transform:translateY(-4px)">…</span> <span style="transform:translateY(-8px)">Tip:</span> <span style="transform:translateY(-5px)">Ctrl-b</span> <span style="transform:translateY(0)">then</span> <span style="transform:translateY(4px)">%</span> <span style="transform:translateY(6px)">splits</span> <span style="transform:translateY(3px)">side</span> <span style="transform:translateY(-2px)">by</span> <span style="transform:translateY(-6px)">side</span> <span style="transform:translateY(-8px)">…</span> <span style="transform:translateY(-5px)">greetings</span> <span style="transform:translateY(0)">to</span> <span style="transform:translateY(4px)">Chris Kempson</span></div>
+        </div>
+        <div class="fbar"><span><b>⏎</b> Start</span><span><b>F3</b> Progress</span><span><b>F4</b> Prefs</span><span><b>F1</b> About</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="cap">Practice: the success sweep</p>
+      <div class="screen">
+        <div class="pad">
+          <div class="intent K" style="font-size:18px">Split this pane side by side</div>
+        </div>
+        <div class="sweep"><span class="g K">Good ✓</span><br>1.6 s / target 2.0 s · combo ×4</div>
+        <div class="pad"><div class="dots">●●<span class="now">●</span><span class="todo">○○○○○○○○○○○○○○</span></div></div>
+        <div class="fbar"><span><b>⌃⇧P</b> Pause</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="shared">
+  <h2>Fonts: bundled, installed, or a file</h2>
+  <p>Eight bundled fonts, all under the SIL Open Font License. Preferences also lists the monospace fonts installed on the computer (read locally, no network) and accepts a font file. The terminal font and the interface font are set separately. Display text (Krypton) and notes (Radon) follow the interface font when it isn't Monaspace.</p>
+  <div class="fonts">
+    <div style="font-family:Argon"><div class="fn">Monaspace Argon · default</div><div class="spec">C-b % 0O1lI</div></div>
+    <div style="font-family:Neon"><div class="fn">Monaspace Neon</div><div class="spec">C-b % 0O1lI</div></div>
+    <div style="font-family:Xenon"><div class="fn">Monaspace Xenon</div><div class="spec">C-b % 0O1lI</div></div>
+    <div style="font-family:Radon"><div class="fn">Monaspace Radon</div><div class="spec">C-b % 0O1lI</div></div>
+    <div style="font-family:Krypton"><div class="fn">Monaspace Krypton</div><div class="spec">C-b % 0O1lI</div></div>
+    <div style="font-family:Inconsolata"><div class="fn">Inconsolata</div><div class="spec">C-b % 0O1lI</div></div>
+    <div style="font-family:'Source Code Pro'"><div class="fn">Source Code Pro</div><div class="spec">C-b % 0O1lI</div></div>
+    <div style="font-family:'Fira Code'"><div class="fn">Fira Code</div><div class="spec">C-b % 0O1lI</div></div>
+  </div>
+  <p>Themes in the bundle: Tomorrow ×5, Solarized ×2, Gruvbox dark and light, Dracula, Nord, Catppuccin Mocha and Latte, plus Keyfluent's green and amber phosphor. Each theme colors the whole app. The About screen credits every theme and font, with links.</p>
+</section>
+</main>
+</body>
+</html>

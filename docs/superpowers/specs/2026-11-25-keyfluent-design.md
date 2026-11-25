@@ -34,6 +34,10 @@ first pack is **tmux**; **Vim** comes later as a second pack.
 6. Show progress per binding on a **progress page**.
 7. Be built from the start so more tools can be added as packs. Vim is next.
 8. Be open source (MIT), private, and offline.
+9. **Be fun.** Lean into the energy of classic arcade games and 90s home computers, and use
+   game-like feedback that helps learning (instant feedback, personal bests, a score line,
+   session summaries). It should feel like play, never like homework, and never guilt or nag.
+   (Samuel, 2026-11-25.)
 
 **Non-goals (v1)**
 - Vim, Emacs or other packs. The architecture must allow them; the content comes later.
@@ -50,6 +54,8 @@ first pack is **tmux**; **Vim** comes later as a second pack.
 - A beginner can't tell what to do on first launch, or what went wrong after a miss.
 - Grading feels unfair: a correct answer marked wrong because the learner took another valid route.
 - It feels like homework. Long sessions, guilt mechanics or nagging.
+- It feels like it is *trying* to be a game (mascots, coins, lootboxes, fake urgency). Fun and
+  game-like feedback are wanted (see Goal 9); being overtly gamified is not.
 - Any network access.
 
 ## 3. Constraints
@@ -250,7 +256,8 @@ All screens are fully keyboard-operable when not practicing, and work with the m
 Layout is designed for laptop and desktop screens (minimum window 1000 × 700). Visual design
 comes from `ui-ux:ux-plan` (§9).
 
-1. **Today:** pack switcher (only tmux in v1), due/new counts, Start, streak calendar strip.
+1. **Today:** the title screen (`DESIGN.md` §7): pack, due/new counts, Start, "days this month"
+   (no streak to lose). Launch plays a synthesized dial-up modem sound (skippable, can be off).
 2. **Practice:**
    - top: the intent sentence, large;
    - centre: the simulated terminal (cell grid, monospace);
@@ -273,11 +280,17 @@ comes from `ui-ux:ux-plan` (§9).
    - **Bindings:** stock, or **Import custom bindings** (paste or open a `tmux list-keys`
      output). Imports are validated and show a summary: changed, new and unsupported bindings.
      Cards follow the imported keys (§6.7).
-   - **Appearance:** light / dark / follow system.
+   - **Appearance:** light / dark / follow system; dark theme and light theme; terminal font and
+     interface font (bundled, installed system fonts, or a font file). Details in `DESIGN.md`.
+   - **Sound:** synthesized chiptune effects and the launch modem sound; on/off, volume,
+     launch sound on/off. Sound is never the only signal.
    - **Data:** export progress (JSON), import progress, reset progress (with confirmation).
-6. **First launch:** a 60-second guided intro. What tmux is in one sentence, what the prefix
+6. **About:** version, license, and credits with links for every bundled theme (Tomorrow,
+   Solarized, Gruvbox, Dracula, Nord, Catppuccin…) and font (Monaspace, Inconsolata, Source
+   Code Pro, Fira Code), plus the open-source crates. (Samuel, 2026-11-25.)
+7. **First launch:** a 60-second guided intro. What tmux is in one sentence, what the prefix
    is, then straight into the first card. No account, no setup questions.
-7. **OS-shortcut warning:** cards whose keys collide with a shortcut reserved on the current
+8. **OS-shortcut warning:** cards whose keys collide with a shortcut reserved on the current
    platform show a badge and a one-line explanation, and are left out of sessions by default.
 
 ### 6.7 Custom bindings

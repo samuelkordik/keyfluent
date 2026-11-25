@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design directions — Keyfluent</title>
+<!-- ux-plan checkpoint sheet. Fonts: Monaspace v1.400 variable (OFL), local copies in ./fonts (not committed).
+     All three directions use Tomorrow Night Bright, the proposed default theme. -->
+<style>
+  @font-face { font-family: "Argon";   src: url("fonts/Monaspace Argon Var.ttf");   font-weight: 200 800; font-stretch: 100% 125%; }
+  @font-face { font-family: "Neon";    src: url("fonts/Monaspace Neon Var.ttf");    font-weight: 200 800; font-stretch: 100% 125%; }
+  @font-face { font-family: "Xenon";   src: url("fonts/Monaspace Xenon Var.ttf");   font-weight: 200 800; font-stretch: 100% 125%; }
+  @font-face { font-family: "Radon";   src: url("fonts/Monaspace Radon Var.ttf");   font-weight: 200 800; font-stretch: 100% 125%; }
+  @font-face { font-family: "Krypton"; src: url("fonts/Monaspace Krypton Var.ttf"); font-weight: 200 800; font-stretch: 100% 125%; }
+
+  :root {
+    /* Tomorrow Night Bright */
+    --bg:#000000; --line:#2a2a2a; --sel:#424242; --fg:#eaeaea; --comment:#969896;
+    --red:#d54e53; --orange:#e78c45; --yellow:#e7c547; --green:#b9ca4a; --aqua:#70c0b1; --blue:#7aa6da; --purple:#c397d8;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 "Argon", monospace; background: #141414; color: var(--fg); }
+  header.sheet { padding: 24px 32px 8px; max-width: 1400px; }
+  header.sheet h1 { font: 700 22px/1.2 "Xenon", monospace; margin: 0 0 6px; }
+  header.sheet p { margin: 0 0 4px; color: var(--comment); max-width: 95ch; }
+  main { padding: 8px 32px 40px; display: grid; gap: 28px; max-width: 1400px; }
+
+  .dir { border: 1px solid var(--sel); background: #0a0a0a; display: grid; grid-template-columns: 330px 1fr; }
+  .dir > .notes { padding: 18px 20px; border-right: 1px solid var(--sel); font-size: 13px; }
+  .dir > .notes h2 { margin: 0 0 4px; font: 700 20px/1.2 "Xenon", monospace; }
+  .dir > .notes .concept { margin: 0 0 12px; color: var(--fg); }
+  .notes dl { margin: 0; }
+  .notes dt { color: var(--comment); margin-top: 8px; }
+  .notes dd { margin: 0; }
+  .dir > .shots { padding: 18px 20px; display: grid; grid-template-columns: 1fr 300px; gap: 18px; align-items: start; }
+  .cap { font-size: 12px; color: var(--comment); margin: 0 0 6px; }
+  .screen { background: var(--bg); border: 1px solid var(--sel); overflow: hidden; }
+
+  /* shared simulated terminal */
+  .term { font: 13px/1.35 "Argon", monospace; background: var(--bg); color: var(--fg); display: flex; flex-direction: column; min-height: 230px; }
+  .term pre { margin: 0; padding: 6px 8px; font: inherit; flex: 1; white-space: pre; }
+  .term .status { background: var(--green); color: #000; display: flex; justify-content: space-between; padding: 0 8px; white-space: pre; }
+  .p { color: var(--green); } .d { color: var(--blue); } .cur { background: var(--fg); color: var(--bg); }
+  .goalpic { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--comment); height: 92px; }
+  .goalpic div + div { border-left: 1px solid var(--green); }
+  .goalpic div { position: relative; }
+  .goalpic div:last-child::after { content: ""; position: absolute; inset: 0; outline: 1px solid var(--green); }
+
+  /* ---------- A · Mainframe ---------- */
+  .A .screen { font: 13px/1.35 "Argon", monospace; }
+  .A fieldset { border: 1px solid var(--comment); margin: 0; padding: 4px 6px 6px; min-width: 0; }
+  .A fieldset.outer { border: 3px double var(--comment); padding: 6px 10px 8px; }
+  .A legend { padding: 0 6px; color: var(--fg); }
+  .A legend.hi { background: var(--fg); color: #000; }
+  .A .intent { font-weight: 700; font-size: 26px; line-height: 1.2; letter-spacing: .02em; margin: 6px 0 10px; font-stretch: 125%; }
+  .A .intent::before { content: "▌"; color: var(--yellow); }
+  .A .row { display: grid; grid-template-columns: 1fr 190px; gap: 8px; }
+  .A .keys { display: flex; justify-content: space-between; margin-top: 6px; }
+  .A .k { color: #000; background: var(--fg); padding: 0 4px; }
+  .A .fbar { display: flex; gap: 14px; padding: 2px 8px; background: var(--line); white-space: pre; }
+  .A .fbar b { background: var(--blue); color: #000; font-weight: 400; padding: 0 2px; }
+  .A .menu { padding: 0; margin: 4px 0; list-style: none; }
+  .A .menu li { padding: 0 6px; }
+  .A .menu li.sel { background: var(--fg); color: #000; }
+  .A .dots { color: var(--green); letter-spacing: .1em; }
+
+  /* ---------- B · Workstation ---------- */
+  .B .app { display: grid; grid-template-columns: 150px 1fr; min-height: 380px; font: 14px/1.45 "Argon", monospace; }
+  .B nav { background: var(--line); padding: 14px 0; display: flex; flex-direction: column; gap: 2px; }
+  .B nav .brand { font: 700 15px "Xenon", monospace; padding: 0 14px 12px; }
+  .B nav a { padding: 6px 14px; color: var(--fg); text-decoration: none; border-left: 3px solid transparent; }
+  .B nav a.on { border-left-color: var(--blue); background: var(--sel); }
+  .B nav .hint { margin-top: auto; padding: 0 14px; color: var(--comment); font-size: 12px; }
+  .B .content { padding: 14px 18px; display: grid; gap: 10px; align-content: start; }
+  .B .crumb { color: var(--comment); font-size: 12px; display: flex; justify-content: space-between; }
+  .B .intent { font: 700 24px/1.2 "Xenon", monospace; margin: 0; }
+  .B .row { display: grid; grid-template-columns: 1fr 180px; gap: 12px; }
+  .B .panel { border: 1px solid var(--sel); border-radius: 3px; }
+  .B .panel h3 { margin: 0; font: 500 12px "Argon", monospace; color: var(--comment); padding: 6px 10px; border-bottom: 1px solid var(--sel); }
+  .B .panel .body { padding: 10px; }
+  .B .strip { display: flex; align-items: center; gap: 8px; }
+  .B .cap-k { display: inline-block; min-width: 30px; text-align: center; padding: 3px 8px 2px; background: var(--line); border: 1px solid var(--sel); border-bottom-width: 4px; border-radius: 4px; font: 600 13px "Argon", monospace; }
+  .B .cap-k.wide { min-width: 52px; }
+  .B .then { color: var(--comment); font-size: 12px; }
+  .B .btn { display: inline-block; padding: 7px 14px; border-radius: 3px; border: 1px solid var(--sel); color: var(--fg); font-size: 13px; }
+  .B .btn.primary { background: var(--blue); color: #000; border-color: var(--blue); font-weight: 700; }
+  .B .footer { display: flex; justify-content: space-between; align-items: center; }
+  .B .pips span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--sel); margin-right: 3px; }
+  .B .pips span.done { background: var(--green); } .B .pips span.now { background: var(--fg); }
+  .B .big { font: 700 34px/1 "Xenon", monospace; }
+  .B .stat { color: var(--comment); font-size: 12px; }
+
+  /* ---------- C · Boot screen ---------- */
+  .C .screen { font: 15px/1.5 "Argon", monospace; }
+  .C .stripe { display: grid; grid-template-columns: repeat(6, 1fr); height: 6px; }
+  .C .stripe i:nth-child(1){background:var(--red)} .C .stripe i:nth-child(2){background:var(--orange)} .C .stripe i:nth-child(3){background:var(--yellow)}
+  .C .stripe i:nth-child(4){background:var(--green)} .C .stripe i:nth-child(5){background:var(--aqua)} .C .stripe i:nth-child(6){background:var(--blue)}
+  .C .practice { padding: 16px 22px 14px; display: grid; gap: 10px; }
+  .C .top { display: flex; justify-content: space-between; color: var(--comment); font-size: 13px; }
+  .C .tag { color: #000; background: var(--blue); padding: 0 6px; font-weight: 700; }
+  .C .intent { font: 800 30px/1.15 "Krypton", monospace; font-stretch: 125%; margin: 2px 0 4px; }
+  .C .row { display: grid; grid-template-columns: 1fr 170px; gap: 14px; }
+  .C .note { font: 400 15px/1.35 "Radon", monospace; color: var(--yellow); }
+  .C .score { border-top: 1px dashed var(--sel); padding-top: 10px; display: flex; gap: 22px; align-items: baseline; }
+  .C .score .grade { font: 800 28px "Krypton", monospace; font-stretch: 125%; color: var(--green); }
+  .C .score .t { font-size: 14px; }
+  .C .title { text-align: center; padding: 26px 16px 18px; display: grid; gap: 10px; }
+  .C .title .wm { font: 800 30px/1 "Krypton", monospace; font-stretch: 125%; letter-spacing: .04em; }
+  .C .title .press { margin-top: 8px; }
+  .C .title .blink { background: var(--fg); color: #000; }
+
+  /* ---------- Theme engine ---------- */
+  .themes { border: 1px solid var(--sel); background: #0a0a0a; padding: 18px 20px; }
+  .themes h2 { margin: 0 0 4px; font: 700 20px "Xenon", monospace; }
+  .themes p { margin: 0 0 12px; color: var(--comment); max-width: 110ch; font-size: 13px; }
+  .tgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .th { border: 1px solid var(--sel); padding: 10px 12px; font: 13px/1.4 "Argon", monospace; }
+  .th .n { font-weight: 700; display: flex; justify-content: space-between; }
+  .th .n small { font-weight: 400; }
+  .th .sw { display: flex; gap: 3px; margin: 6px 0; }
+  .th .sw i { flex: 1; height: 14px; }
+  .fonts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 16px; }
+  .fonts div { border: 1px solid var(--sel); padding: 10px 12px; }
+  .fonts .fn { color: var(--comment); font: 12px "Argon", monospace; }
+  .fonts .spec { font-size: 18px; line-height: 1.3; }
+</style>
+</head>
+<body>
+<header class="sheet">
+  <h1>Keyfluent: design directions</h1>
+  <p>Three ways to give Keyfluent an 80s and early-90s terminal feel. All three share the same base: Monaspace Argon as the default font (all five Monaspace faces included, plus your own font), and a theme engine with Tomorrow Night Bright as the default. They differ in layout, density, type voice and signature move. Pick one, or combine parts. Nothing is built yet.</p>
+  <p>Mock content is real: the first Basics card ("Split this pane side by side"), card 3 of a 17-card session, with the prefix just pressed.</p>
+</header>
+<main>
+
+<!-- ================= A ================= -->
+<section class="dir A">
+  <div class="notes">
+    <h2>A · Mainframe</h2>
+    <p class="concept">The whole app is a text-mode program: every screen is drawn as a character grid with box frames, like a DOS-era tool or a BBS.</p>
+    <dl>
+      <dt>Mood</dt><dd>immersive, crisp, nerdy</dd>
+      <dt>Layout</dt><dd>Full-window frame; menus as highlighted lists; function-key bar at the bottom (F1 Help, F2 Today, F3 Progress, F4 Preferences; outside practice only)</dd>
+      <dt>Density</dt><dd>compact: one 13–14 px grid, 1 row = 1 line</dd>
+      <dt>Type</dt><dd>Argon only, at one size. The intent line is double-width and bold, like a DEC double-size line</dd>
+      <dt>Color</dt><dd>Theme as-is. Frames in the comment color; selection as an inverse bar; one yellow marker</dd>
+      <dt>Shape / motion</dt><dd>Zero radius, double-line outer frame. Motion: a blinking cursor, nothing else</dd>
+      <dt>Signature move</dt><dd>No visible GUI widgets at all: the app looks like it runs inside the terminal it teaches</dd>
+      <dt>Best for</dt><dd>People who already love terminals; maximum nostalgia</dd>
+      <dt>Trade-off</dt><dd>Hardest for a beginner who has never used a terminal. Every control is a custom egui widget (more build work, accessibility labels by hand). Preferences forms feel cramped.</dd>
+    </dl>
+  </div>
+  <div class="shots">
+    <div>
+      <p class="cap">Practice, 1000 × 700 window</p>
+      <div class="screen">
+        <div style="padding:10px 12px 8px">
+        <fieldset class="outer"><legend class="hi"> KEYFLUENT · tmux · Basics </legend>
+          <div style="display:flex;justify-content:space-between;color:var(--comment)"><span>New card</span><span>card 3 of 17</span></div>
+          <div class="intent">Split this pane side by side</div>
+          <div class="row">
+            <fieldset><legend> terminal </legend>
+              <div class="term" style="min-height:200px">
+<pre><span class="p">you@laptop</span>:<span class="d">~/site</span>$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+<span class="p">you@laptop</span>:<span class="d">~/site</span>$ <span class="cur"> </span></pre>
+                <div class="status"><span>[0] 0:bash*</span><span>"laptop" 14:02 25-Nov-26</span></div>
+              </div>
+            </fieldset>
+            <fieldset><legend> goal </legend>
+              <div class="goalpic" style="margin-top:6px"><div></div><div></div></div>
+              <p style="margin:8px 0 0;color:var(--comment)">2 panes, side by side</p>
+            </fieldset>
+          </div>
+          <div class="keys">
+            <span>keys <span class="k">Ctrl</span>+<span class="k">b</span> <span style="color:var(--yellow)">◆ prefix on</span></span>
+            <span class="dots">●●○○○○○○○○○○○○○○○</span>
+          </div>
+        </fieldset>
+        </div>
+        <div class="fbar"><span><b>⌃⇧P</b> Pause</span><span>Show me (pause menu)</span><span style="margin-left:auto;color:var(--comment)">every other key goes to tmux</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="cap">Today</p>
+      <div class="screen" style="padding:10px">
+        <fieldset class="outer"><legend class="hi"> Today </legend>
+          <p style="margin:4px 0">tmux · prefix <span class="k">Ctrl</span>+<span class="k">b</span></p>
+          <p style="margin:0">12 reviews due<br>&nbsp;5 new cards</p>
+          <ul class="menu">
+            <li class="sel">▶ Start practice   ⏎</li>
+            <li>&nbsp; Progress</li>
+            <li>&nbsp; Preferences</li>
+          </ul>
+          <p style="margin:6px 0 0;color:var(--comment)">last 14 days</p>
+          <p style="margin:0;color:var(--green)">▪▪▪<span style="color:var(--sel)">▪</span>▪▪▪▪▪<span style="color:var(--sel)">▪▪</span>▪▪▪</p>
+        </fieldset>
+        <div class="fbar" style="margin-top:8px;font-size:12px"><span><b>F1</b>Help</span><span><b>F3</b>Progress</span><span><b>F4</b>Prefs</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= B ================= -->
+<section class="dir B">
+  <div class="notes">
+    <h2>B · Workstation</h2>
+    <p class="concept">A normal desktop app (sidebar, panels, buttons) dressed like an early-90s Unix workstation, with the terminal as the hero.</p>
+    <dl>
+      <dt>Mood</dt><dd>calm, capable, tactile</dd>
+      <dt>Layout</dt><dd>Left rail (Today, Progress, Preferences); content; goal picture in a side panel. The rail hides during practice</dd>
+      <dt>Density</dt><dd>comfortable: base 15 px, 8 / 12 / 16 px spacing</dd>
+      <dt>Type</dt><dd>Argon for UI and the terminal; Xenon (slab) for headings and the intent; ratio 1.25</dd>
+      <dt>Color</dt><dd>Theme surfaces (background, current line) + one accent from the theme's blue for primary and focus; status colors only for grades (always with a word)</dd>
+      <dt>Shape / motion</dt><dd>3 px radius, 1 px borders, no shadows. Motion for feedback only: keycap press, result flash</dd>
+      <dt>Signature move</dt><dd>Chunky raised keycaps, like an old mechanical keyboard, used for every key shown (intro, strip, "Shortest" hint)</dd>
+      <dt>Best for</dt><dd>Complete beginners, and the Preferences and Progress screens. The easiest build in egui</dd>
+      <dt>Trade-off</dt><dd>The least "fun" of the three. The retro feel lives in the details (font, keycaps, theme), not the structure</dd>
+    </dl>
+  </div>
+  <div class="shots">
+    <div>
+      <p class="cap">Practice, 1000 × 700 window (rail shown here for context; it collapses during practice)</p>
+      <div class="screen app">
+        <nav>
+          <div class="brand">keyfluent</div>
+          <a class="on">Today</a><a>Progress</a><a>Preferences</a>
+          <div class="hint">tmux pack<br>stock bindings</div>
+        </nav>
+        <div class="content">
+          <div class="crumb"><span>Basics · new card</span><span>3 of 17</span></div>
+          <h3 class="intent">Split this pane side by side</h3>
+          <div class="row">
+            <div class="panel" style="overflow:hidden">
+              <div class="term">
+<pre><span class="p">you@laptop</span>:<span class="d">~/site</span>$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+<span class="p">you@laptop</span>:<span class="d">~/site</span>$ <span class="cur"> </span></pre>
+                <div class="status"><span>[0] 0:bash*</span><span>"laptop" 14:02</span></div>
+              </div>
+            </div>
+            <div class="panel"><h3>Goal</h3><div class="body"><div class="goalpic"><div></div><div></div></div><p class="stat" style="margin:8px 0 0">2 panes, side by side</p></div></div>
+          </div>
+          <div class="strip"><span class="stat">Keys</span><span class="cap-k wide">Ctrl</span><span class="cap-k">b</span><span class="then">prefix on, now the next key</span></div>
+          <div class="footer"><div class="pips"><span class="done"></span><span class="done"></span><span class="now"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><span class="btn">Pause  ⌃⇧P</span></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="cap">Today</p>
+      <div class="screen" style="padding:16px;font:14px/1.45 'Argon',monospace">
+        <h3 class="intent" style="font-size:20px;margin:0 0 10px">Today</h3>
+        <div style="display:flex;gap:22px;margin-bottom:12px">
+          <div><div class="big">12</div><div class="stat">reviews due</div></div>
+          <div><div class="big">5</div><div class="stat">new cards</div></div>
+        </div>
+        <span class="btn primary">Start practice  ⏎</span>
+        <p class="stat" style="margin:14px 0 4px">Prefix <span class="cap-k wide" style="font-size:11px;min-width:40px">Ctrl</span> <span class="cap-k" style="font-size:11px;min-width:22px">b</span></p>
+        <p class="stat" style="margin:10px 0 2px">Last 14 days</p>
+        <div class="pips"><span class="done"></span><span class="done"></span><span class="done"></span><span></span><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span><span></span><span></span><span class="done"></span><span class="done"></span><span class="done"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= C ================= -->
+<section class="dir C">
+  <div class="notes">
+    <h2>C · Boot screen</h2>
+    <p class="concept">Early-90s home computer and arcade energy: big display type, a rainbow stripe, a score line after every card.</p>
+    <dl>
+      <dt>Mood</dt><dd>playful, bold, warm</dd>
+      <dt>Layout</dt><dd>Centered single column. Today is a title screen ("Press Enter to start"); Progress and Preferences open from it as full screens</dd>
+      <dt>Density</dt><dd>spacious: base 16 px, big headings, generous margins</dd>
+      <dt>Type</dt><dd>Mixes Monaspace faces: Krypton (wide, heavy) for display, Argon for body and the terminal, Radon (handwriting) for teach notes</dd>
+      <dt>Color</dt><dd>All six theme accents in use: each category owns one (Basics blue, Copy mode green, Sessions purple, Layout orange); the stripe uses them all</dd>
+      <dt>Shape / motion</dt><dd>Square corners, dashed rules. Motion: a score count-up on the result flash (off with reduced motion)</dd>
+      <dt>Signature move</dt><dd>The result flash as an arcade score line: <i>GOOD · 1.6 s / target 2.0 s</i>; and the six-color stripe</dd>
+      <dt>Best for</dt><dd>Making short daily practice feel like play</dd>
+      <dt>Trade-off</dt><dd>Edges toward "gamified", which the spec warns against (no guilt, no nagging). Big type crowds the 1000 × 700 minimum. Heavy color use makes weaker themes look garish, and every category color needs a contrast check in every theme</dd>
+    </dl>
+  </div>
+  <div class="shots">
+    <div>
+      <p class="cap">Practice (result flash after success), 1000 × 700 window</p>
+      <div class="screen">
+        <div class="stripe"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="practice">
+          <div class="top"><span><span class="tag">BASICS</span> new card</span><span>3 / 17</span></div>
+          <div class="intent">Split this pane side by side</div>
+          <div class="row">
+            <div class="screen" style="border-color:var(--sel)">
+              <div class="term" style="min-height:170px">
+<pre><span class="p">you@laptop</span>:<span class="d">~/site</span>$ git status
+On branch main
+nothing to commit, working tree clean
+<span class="p">you@laptop</span>:<span class="d">~/site</span>$ <span class="cur"> </span></pre>
+                <div class="status"><span>[0] 0:bash*</span><span>"laptop" 14:02</span></div>
+              </div>
+            </div>
+            <div>
+              <div class="goalpic"><div></div><div></div></div>
+              <p class="note" style="margin:10px 0 0">Every tmux shortcut starts with the prefix: Ctrl-b, let go, then one key.</p>
+            </div>
+          </div>
+          <div class="score"><span class="grade">GOOD ✓</span><span class="t">1.6 s / target 2.0 s</span><span class="t" style="color:var(--comment)">Enter: next card</span></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="cap">Today (title screen)</p>
+      <div class="screen">
+        <div class="stripe"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="title">
+          <div class="wm">KEYFLUENT</div>
+          <div style="color:var(--comment)">tmux pack · prefix Ctrl-b</div>
+          <div style="font-size:18px">12 due · 5 new</div>
+          <div class="press">Press Enter to start<span class="blink"> </span></div>
+          <div style="color:var(--comment);font-size:13px;margin-top:6px">P Progress · , Preferences</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Shared: theme engine + fonts ================= -->
+<section class="themes">
+  <h2>Shared by every direction: themes and fonts</h2>
+  <p>Each theme sets the simulated terminal's colors and the app's colors at once. Shipped themes are tested content: a test fails any theme whose text, muted text, focus or grade colors fall under WCAG AA. Where an original theme color fails (light Tomorrow's comment gray, most Solarized pairs), the theme ships with the nearest passing shade of the same hue. A preference can show the exact original colors instead. "Follow system" picks your chosen dark theme or light theme.</p>
+  <div class="tgrid">
+    <div class="th" style="background:#000;color:#eaeaea;outline:2px solid #7aa6da"><div class="n">Tomorrow Night Bright <small>default dark · AA as-is</small></div><div class="sw"><i style="background:#d54e53"></i><i style="background:#e78c45"></i><i style="background:#e7c547"></i><i style="background:#b9ca4a"></i><i style="background:#70c0b1"></i><i style="background:#7aa6da"></i><i style="background:#c397d8"></i></div><span style="color:#969896">muted 7.2:1</span> · <span style="color:#7aa6da">accent 8.3:1</span></div>
+    <div class="th" style="background:#ffffff;color:#4d4d4c"><div class="n">Tomorrow <small>default light · 1 adjusted</small></div><div class="sw"><i style="background:#c82829"></i><i style="background:#f5871f"></i><i style="background:#eab700"></i><i style="background:#718c00"></i><i style="background:#3e999f"></i><i style="background:#4271ae"></i><i style="background:#8959a8"></i></div><span style="color:#6c6d6a">muted #8e908c → #6c6d6a</span> · <span style="color:#4271ae">accent 5.0:1</span></div>
+    <div class="th" style="background:#1d1f21;color:#c5c8c6"><div class="n">Tomorrow Night <small>AA as-is</small></div><div class="sw"><i style="background:#cc6666"></i><i style="background:#de935f"></i><i style="background:#f0c674"></i><i style="background:#b5bd68"></i><i style="background:#8abeb7"></i><i style="background:#81a2be"></i><i style="background:#b294bb"></i></div><span style="color:#969896">muted 5.7:1</span></div>
+    <div class="th" style="background:#2d2d2d;color:#cccccc"><div class="n">Tomorrow Night Eighties <small>AA as-is</small></div><div class="sw"><i style="background:#f2777a"></i><i style="background:#f99157"></i><i style="background:#ffcc66"></i><i style="background:#99cc99"></i><i style="background:#66cccc"></i><i style="background:#6699cc"></i><i style="background:#cc99cc"></i></div><span style="color:#999999">muted 4.8:1</span></div>
+    <div class="th" style="background:#002451;color:#ffffff"><div class="n">Tomorrow Night Blue <small>1 adjusted</small></div><div class="sw"><i style="background:#ff9da4"></i><i style="background:#ffc58f"></i><i style="background:#ffeead"></i><i style="background:#d1f1a9"></i><i style="background:#99ffff"></i><i style="background:#bbdaff"></i><i style="background:#ebbbff"></i></div><span style="color:#778bbd">muted #7285b7 → #778bbd</span></div>
+    <div class="th" style="background:#002b36;color:#8a9c9e"><div class="n">Solarized Dark <small>several adjusted</small></div><div class="sw"><i style="background:#dc322f"></i><i style="background:#cb4b16"></i><i style="background:#b58900"></i><i style="background:#859900"></i><i style="background:#2aa198"></i><i style="background:#268bd2"></i><i style="background:#6c71c4"></i></div><span style="color:#859ca3">muted #586e75 → #859ca3</span></div>
+    <div class="th" style="background:#fdf6e3;color:#576c74"><div class="n">Solarized Light <small>several adjusted</small></div><div class="sw"><i style="background:#dc322f"></i><i style="background:#cb4b16"></i><i style="background:#b58900"></i><i style="background:#859900"></i><i style="background:#2aa198"></i><i style="background:#268bd2"></i><i style="background:#6c71c4"></i></div><span style="color:#5e6b6c">muted #93a1a1 → #5e6b6c</span></div>
+    <div class="th" style="background:#0a0f0a;color:#33ff66"><div class="n">Green phosphor <small>Keyfluent original</small></div><div class="sw"><i style="background:#33ff66"></i><i style="background:#1fbf4a"></i><i style="background:#14803a"></i></div>one hue: text 14.4:1, muted 7.9:1, dim 3.9:1 (borders only)</div>
+    <div class="th" style="background:#0f0a00;color:#ffb000"><div class="n">Amber phosphor <small>Keyfluent original</small></div><div class="sw"><i style="background:#ffb000"></i><i style="background:#c78600"></i><i style="background:#8a5c00"></i></div>one hue: text 10.8:1, muted 6.4:1, dim 3.4:1 (borders only)</div>
+  </div>
+  <p style="margin-top:12px">Candidates for the rest of the bundle (all MIT): Gruvbox dark and light, Dracula, Nord, Catppuccin Mocha and Latte. Phosphor themes rely on brightness alone, so grades there use words and icons only (already the rule). The five MIT candidates are measured when tokens are written.</p>
+  <div class="fonts">
+    <div style="font-family:Argon"><div class="fn">Argon · default</div><div class="spec">Split this pane<br>C-b % 0123</div></div>
+    <div style="font-family:Neon"><div class="fn">Neon</div><div class="spec">Split this pane<br>C-b % 0123</div></div>
+    <div style="font-family:Xenon"><div class="fn">Xenon (slab)</div><div class="spec">Split this pane<br>C-b % 0123</div></div>
+    <div style="font-family:Radon"><div class="fn">Radon (handwriting)</div><div class="spec">Split this pane<br>C-b % 0123</div></div>
+    <div style="font-family:Krypton"><div class="fn">Krypton (mechanical)</div><div class="spec">Split this pane<br>C-b % 0123</div></div>
+  </div>
+  <p style="margin-top:12px">Font preference: any of the five (variable weight and width), or a .ttf/.otf you pick, copied into Keyfluent's data folder. Separate choices for the terminal font and the interface font; both default to Argon.</p>
+</section>
+</main>
+</body>
+</html>
