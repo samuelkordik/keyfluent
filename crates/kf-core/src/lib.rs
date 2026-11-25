@@ -1,5 +1,7 @@
 //! Keyfluent core: cards, grading and scheduling. No UI code.
 
+pub mod key;
+
 /// Crate version, shared by the whole workspace.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
