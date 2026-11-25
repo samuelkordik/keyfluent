@@ -119,14 +119,27 @@ fn submit(input: &str, template: &[CommandLine]) -> PromptStep {
 pub fn substitute(template: &[CommandLine], input: &str) -> Vec<CommandLine> {
     template
         .iter()
-        .map(|c| {
-            CommandLine(
-                c.0.iter()
-                    .map(|w| w.replace("%%", input).replace("%1", input))
-                    .collect(),
-            )
-        })
+        .map(|c| CommandLine(c.0.iter().map(|w| substitute_word(w, input)).collect()))
         .collect()
+}
+
+/// One left-to-right pass, so placeholders typed in `input` stay literal.
+fn substitute_word(word: &str, input: &str) -> String {
+    let mut out = String::new();
+    let mut rest = word;
+    while let Some(pos) = rest.find('%') {
+        out.push_str(rest.get(..pos).unwrap_or_default());
+        let after = rest.get(pos + 1..).unwrap_or_default();
+        if let Some(tail) = after.strip_prefix('%').or_else(|| after.strip_prefix('1')) {
+            out.push_str(input);
+            rest = tail;
+        } else {
+            out.push('%');
+            rest = after;
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 #[cfg(test)]
@@ -160,6 +173,15 @@ mod tests {
         assert_eq!(
             substitute(&[cmd("a %% b%%c %1"), cmd("x")], "in"),
             vec![cmd("a in binc in"), cmd("x")]
+        );
+        // Placeholders in the input are not substituted again.
+        assert_eq!(
+            substitute(&[cmd("rename-window %%")], "a%1"),
+            vec![cmd("rename-window a%1")]
+        );
+        assert_eq!(
+            substitute(&[cmd("a%2 %%% 50%")], "x"),
+            vec![cmd("a%2 x% 50%")]
         );
     }
 

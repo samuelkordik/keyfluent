@@ -11,9 +11,10 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// What a simulator did with one key press.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct KeyOutcome {
-    /// The key was typed into an open prompt (command prompt, rename,
-    /// confirm, search). Such keys don't count against the failure budget
-    /// (spec §6.4).
+    /// The key was typed text: input to an open prompt (rename, the command
+    /// prompt), a search or the shell line. Such keys don't count against the
+    /// failure budget (spec §6.4). Answering a confirm (`y`/`n`) is not text
+    /// entry: it counts as a binding key.
     pub text_entry: bool,
 }
 

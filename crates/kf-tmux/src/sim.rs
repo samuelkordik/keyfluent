@@ -93,6 +93,7 @@ impl Tmux {
         self.now = now;
         self.server.message = None;
         if let Some(prompt) = self.prompt.as_mut() {
+            let text_entry = !matches!(prompt, Prompt::Confirm { .. });
             match prompt.key(k) {
                 PromptStep::Open => {}
                 PromptStep::Closed => self.prompt = None,
@@ -105,7 +106,7 @@ impl Tmux {
                     self.server.message = Some(message);
                 }
             }
-            return KeyOutcome { text_entry: true };
+            return KeyOutcome { text_entry };
         }
         if self.prefix_pending {
             self.prefix_pending = false;
@@ -181,9 +182,10 @@ impl Tmux {
         self.prefix_pending
     }
 
-    /// A prompt or confirm is open: keys go to it as typed text.
+    /// An input prompt is open: keys go to it as typed text. False while a
+    /// confirm is open (its answer is a binding key).
     pub fn in_text_entry(&self) -> bool {
-        self.prompt.is_some()
+        matches!(self.prompt, Some(Prompt::Input { .. }))
     }
 }
 
@@ -292,17 +294,18 @@ mod tests {
     fn confirm_kill_pane() {
         let mut t = tmux("two-panes-h");
         press(&mut t, "C-b x");
-        assert!(t.in_text_entry());
+        assert!(!t.in_text_entry());
         assert!(t
             .grid(80, 24)
             .row_text(23)
             .starts_with("kill-pane 1? (y/n)"));
-        assert!(press(&mut t, "y")[0].text_entry);
+        assert!(!press(&mut t, "y")[0].text_entry);
         assert_eq!(win(&t).panes.len(), 1);
 
         let mut t = tmux("two-panes-h");
-        press(&mut t, "C-b x n");
-        assert!(!t.in_text_entry());
+        press(&mut t, "C-b x");
+        assert!(!press(&mut t, "n")[0].text_entry);
+        assert!(t.grid(80, 24).row_text(23).starts_with("[0] "));
         assert_eq!(win(&t).panes.len(), 2);
     }
 
@@ -349,7 +352,7 @@ mod tests {
         assert_eq!(win(&t).panes.len(), 1);
         let mut t = tmux("three-windows");
         press(&mut t, "C-b : c o n f i r m Space k i l l w Enter");
-        assert!(t.in_text_entry());
+        assert!(t.grid(80, 24).row_text(23).starts_with("Confirm 'killw'?"));
         press(&mut t, "y");
         assert_eq!(t.server().sessions[0].windows.len(), 2);
     }
