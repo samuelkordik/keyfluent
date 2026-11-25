@@ -1686,6 +1686,7 @@ name = "kf-tmux"
 version = "0.1.0"
 dependencies = [
  "kf-core",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

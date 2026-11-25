@@ -13,3 +13,4 @@ workspace = true
 
 [dependencies]
 kf-core = { version = "0.1.0", path = "../kf-core" }
+thiserror = "2"

@@ -342,6 +342,11 @@ impl KeyTables {
             .collect()
     }
 
+    /// Every binding in `table`, in key order (empty for an unknown table).
+    pub fn bindings(&self, table: &str) -> impl Iterator<Item = &Binding> {
+        self.tables.get(table).into_iter().flat_map(|t| t.values())
+    }
+
     /// Table names, sorted.
     pub fn tables(&self) -> impl Iterator<Item = &str> {
         self.tables.keys().map(String::as_str)
@@ -546,6 +551,9 @@ bind-key -T root M-b if-shell -F "#{x}" { send-keys -M } { copy-mode -H ; send-k
         assert!(t.keys_for("nope", &["split-window"]).is_empty());
         assert_eq!(t.keys_for("prefix", &["split-window"]).len(), 2);
         assert!(t.keys_for("prefix", &["split-window", "-v"]).is_empty());
+        let keys: Vec<Key> = t.bindings("prefix").map(|b| b.key).collect();
+        assert_eq!(keys, vec![key("\""), key("%")]);
+        assert_eq!(t.bindings("nope").count(), 0);
     }
 
     #[test]

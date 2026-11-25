@@ -86,29 +86,60 @@ fn split_sizes(total: u16, n: usize) -> Vec<u16> {
 }
 
 /// The pane next to `from` in direction `dir`, or `None` at the window edge
-/// (wrapping is the command's job). Among several adjacent panes the one sharing
-/// the longest edge with `from` wins, the first in layout order on a tie (tmux
-/// picks the most recently used; the model keeps no such history).
+/// (see [`neighbour_wrapping`] for tmux's wrap-around). Among several adjacent
+/// panes the one sharing the longest edge with `from` wins, the first in layout
+/// order on a tie (tmux picks the most recently used; the model keeps no such
+/// history).
 pub fn neighbour(layout: &Layout, area: Rect, from: PaneId, dir: Dir) -> Option<PaneId> {
+    find_neighbour(layout, area, from, dir, false)
+}
+
+/// Like [`neighbour`], but at the window edge the search continues from the
+/// opposite edge, as tmux's `select-pane -L/-R/-U/-D` do: moving left from the
+/// leftmost pane reaches the rightmost pane beside it. `None` only if `from` is
+/// not in the layout or is the only pane in that row/column.
+pub fn neighbour_wrapping(layout: &Layout, area: Rect, from: PaneId, dir: Dir) -> Option<PaneId> {
+    find_neighbour(layout, area, from, dir, false)
+        .or_else(|| find_neighbour(layout, area, from, dir, true))
+}
+
+/// Edges of a rectangle as `(left, right, top, bottom)`, right/bottom exclusive.
+fn span(r: &Rect) -> (u32, u32, u32, u32) {
+    (
+        u32::from(r.x),
+        u32::from(r.x) + u32::from(r.w),
+        u32::from(r.y),
+        u32::from(r.y) + u32::from(r.h),
+    )
+}
+
+/// The best pane beside `from` in direction `dir`. With `wrap`, "beside" means
+/// touching the opposite edge of `area` instead of `from`'s own edge.
+fn find_neighbour(
+    layout: &Layout,
+    area: Rect,
+    from: PaneId,
+    dir: Dir,
+    wrap: bool,
+) -> Option<PaneId> {
     let geo = geometry(layout, area);
     let (_, f) = geo.iter().find(|(id, _)| *id == from)?;
-    let span = |r: &Rect| {
-        (
-            u32::from(r.x),
-            u32::from(r.x) + u32::from(r.w),
-            u32::from(r.y),
-            u32::from(r.y) + u32::from(r.h),
-        )
-    };
     let (fx0, fx1, fy0, fy1) = span(f);
+    let (ax0, ax1, ay0, ay1) = span(&area);
     let mut best: Option<(PaneId, u32)> = None;
     for (id, r) in geo.iter().filter(|(id, _)| *id != from) {
         let (x0, x1, y0, y1) = span(r);
-        let (adjacent, overlap) = match dir {
-            Dir::Left => (x1 + 1 == fx0, y1.min(fy1).saturating_sub(y0.max(fy0))),
-            Dir::Right => (fx1 + 1 == x0, y1.min(fy1).saturating_sub(y0.max(fy0))),
-            Dir::Up => (y1 + 1 == fy0, x1.min(fx1).saturating_sub(x0.max(fx0))),
-            Dir::Down => (fy1 + 1 == y0, x1.min(fx1).saturating_sub(x0.max(fx0))),
+        let rows = y1.min(fy1).saturating_sub(y0.max(fy0));
+        let cols = x1.min(fx1).saturating_sub(x0.max(fx0));
+        let (adjacent, overlap) = match (dir, wrap) {
+            (Dir::Left, false) => (x1 + 1 == fx0, rows),
+            (Dir::Right, false) => (fx1 + 1 == x0, rows),
+            (Dir::Up, false) => (y1 + 1 == fy0, cols),
+            (Dir::Down, false) => (fy1 + 1 == y0, cols),
+            (Dir::Left, true) => (x1 == ax1, rows),
+            (Dir::Right, true) => (x0 == ax0, rows),
+            (Dir::Up, true) => (y1 == ay1, cols),
+            (Dir::Down, true) => (y0 == ay0, cols),
         };
         if adjacent && overlap > 0 && best.is_none_or(|(_, o)| overlap > o) {
             best = Some((*id, overlap));
@@ -276,5 +307,35 @@ mod tests {
         };
         assert_eq!(neighbour(&l, AREA, PaneId(0), Dir::Right), Some(PaneId(1)));
         assert_eq!(neighbour(&l, AREA, PaneId(2), Dir::Left), Some(PaneId(0)));
+    }
+
+    #[test]
+    fn neighbour_wraps_at_the_edge() {
+        let l = layout("two-panes-h");
+        assert_eq!(neighbour(&l, AREA, PaneId(1), Dir::Right), None);
+        assert_eq!(
+            neighbour_wrapping(&l, AREA, PaneId(1), Dir::Right),
+            Some(PaneId(0))
+        );
+        assert_eq!(
+            neighbour_wrapping(&l, AREA, PaneId(0), Dir::Left),
+            Some(PaneId(1))
+        );
+        // No pane above or below in a side-by-side split.
+        assert_eq!(neighbour_wrapping(&l, AREA, PaneId(0), Dir::Up), None);
+        let four = layout("four-panes");
+        assert_eq!(
+            neighbour_wrapping(&four, AREA, PaneId(3), Dir::Down),
+            Some(PaneId(2))
+        );
+        assert_eq!(
+            neighbour_wrapping(&four, AREA, PaneId(1), Dir::Left),
+            Some(PaneId(3))
+        );
+        assert_eq!(
+            neighbour_wrapping(&layout("one-pane"), AREA, PaneId(0), Dir::Left),
+            None
+        );
+        assert_eq!(neighbour_wrapping(&four, AREA, PaneId(9), Dir::Left), None);
     }
 }
