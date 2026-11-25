@@ -1,6 +1,8 @@
+use kf_app::probe::ProbeApp;
 use kf_app::{KeyfluentApp, APP_NAME, MIN_WINDOW_SIZE};
 
 fn main() -> eframe::Result {
+    let key_probe = std::env::args().any(|a| a == "--key-probe");
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_title(APP_NAME)
@@ -11,6 +13,12 @@ fn main() -> eframe::Result {
     eframe::run_native(
         APP_NAME,
         options,
-        Box::new(|_cc| Ok(Box::<KeyfluentApp>::default())),
+        Box::new(move |_cc| {
+            if key_probe {
+                Ok(Box::<ProbeApp>::default())
+            } else {
+                Ok(Box::<KeyfluentApp>::default())
+            }
+        }),
     )
 }

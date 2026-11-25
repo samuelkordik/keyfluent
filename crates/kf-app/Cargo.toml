@@ -16,6 +16,9 @@ eframe = "0.37.0"
 kf-core = { version = "0.1.0", path = "../kf-core" }
 kf-tmux = { version = "0.1.0", path = "../kf-tmux" }
 
+[dev-dependencies]
+egui_kittest = { version = "0.37", features = ["eframe"] }
+
 [lib]
 path = "src/lib.rs"
 

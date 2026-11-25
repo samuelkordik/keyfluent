@@ -3,6 +3,8 @@
 // Linked now so the dependency graph matches the plan; used from P1 onward.
 use kf_tmux as _;
 
+pub mod probe;
+
 /// Window title.
 pub const APP_NAME: &str = "Keyfluent";
 
