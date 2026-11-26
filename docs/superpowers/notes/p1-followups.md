@@ -31,3 +31,8 @@
 - **P4 (curriculum):** valid-but-unmodelled flags (`splitw -p`, `killp -a`) should be NotSimulated, not BadArgs; BadArgs is also used for runtime states; split commands.rs (args/targets/expand) before adding sessions and copy mode; MRU stack for last pane/window (tmux keeps one; we reset to None after kill); neighbour tie-break by most recent use; wide characters and tabs in pane text.
 - **P5 (import):** the tokenizer only handles `\x` (no `\n` `\e` `\u`); `keys_for` matches by word prefix and must match exact, normalized commands before recomputing canonical keys; the prefix indicator is hard-coded `^B`.
 - **Trivial:** comment on the `C--` loop in key.rs; half-border comment in render.rs; a non-string card `id` is reported as missing.
+
+## Carried from the P2 final review (do first in P3)
+- store.rs `plausible`: the `stability >= 0.01` floor for non-New cards rejects real Learning/Relearning cards after ~7 Agains (rs-fsrs short-term stability has no floor). Require `stability > 0.0` and finite instead; add a test with a card failed 8 times in Learning that survives save/reload unchanged.
+- After a prefs load that had a bad field, save the corrected prefs once so a `.bad` copy isn't written on every launch.
+- Later: a prefs copy-aside failure leaves the bad value only as a note; a non-object pack value sets the whole progress file aside (nothing lost).
