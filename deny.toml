@@ -41,3 +41,7 @@ unknown-git = "deny"
 [advisories]
 # Unmaintained-crate notices are reviewed manually rather than failing the build.
 unmaintained = "workspace"
+# rs-fsrs (the FSRS scheduler) requires chrono, and the app's due dates are chrono types.
+# RUSTSEC-2026-0543 is an "unmaintained" notice only (no vulnerability); revisit if rs-fsrs
+# moves to jiff/time.
+ignore = ["RUSTSEC-2026-0543"]
