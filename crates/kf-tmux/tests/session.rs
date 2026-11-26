@@ -313,7 +313,8 @@ fn full_session_round_trip() {
     assert_eq!(log.value.len(), 17);
     assert!(log.value.iter().all(|r| r.grade == Grade::Easy && !r.intro));
 
-    // Nothing left today; everything comes back within 30 days.
+    // Nothing left right now (ruling 13: the first Easy is scheduled as Good,
+    // a short learning step); everything comes back within 30 days.
     assert_eq!(
         app.plan(now),
         Plan {
@@ -331,14 +332,17 @@ fn full_session_round_trip() {
         }
     );
     assert_eq!(days_this_month(&log.value, now, utc0()), 1);
-    assert_eq!(due_tomorrow(&app.pack_progress(), now, utc0()), 0);
+    assert_eq!(due_tomorrow(&app.pack_progress(), now, utc0()), 17);
 
     let summary = app.finish(Duration::from_secs(600));
     assert_eq!(summary.cards, 17);
     assert_eq!(summary.per_grade, [0, 0, 0, 17]);
     assert_eq!(summary.best_combo, 17);
     assert_eq!(summary.new_bests.len(), 17);
-    assert_eq!((summary.next_reviews_tomorrow, summary.new_waiting), (0, 0));
+    assert_eq!(
+        (summary.next_reviews_tomorrow, summary.new_waiting),
+        (17, 0)
+    );
 }
 
 #[test]

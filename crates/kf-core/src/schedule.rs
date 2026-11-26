@@ -157,6 +157,10 @@ impl Scheduler {
             Grade::Again => Rating::Again,
             Grade::Hard => Rating::Hard,
             Grade::Good => Rating::Good,
+            // Ruling 13: a new card's first review comes seconds after its
+            // intro showed the keys, so Easy there is short-term recall. FSRS
+            // would skip the learning steps; send at most Good.
+            Grade::Easy if next.fsrs.state == State::New => Rating::Good,
             Grade::Easy => Rating::Easy,
         };
         let scheduled = self.fsrs.next(next.fsrs.clone(), now, rating).card;
@@ -294,6 +298,44 @@ mod tests {
         assert!(text.contains("2345"));
         let back: CardProgress = toml::from_str(&text).unwrap();
         assert_eq!(back, p);
+    }
+
+    #[test]
+    fn first_easy_is_scheduled_as_good() {
+        let s = Scheduler::new();
+        let (p, best) = s.review(None, &graded(Grade::Easy, 900), t0());
+        assert_eq!(p.mastery(), Mastery::Learning);
+        assert!(p.due() < t0() + chrono::Duration::days(1), "{:?}", p.due());
+        assert!(best);
+        assert_eq!(p.best, Some(Duration::from_millis(900)));
+        // A card reset to New (no reviews kept) is capped too.
+        let reset = CardProgress {
+            fsrs: new_card(t0()),
+            ..p.clone()
+        };
+        let (r, _) = s.review(Some(&reset), &graded(Grade::Easy, 900), t0());
+        assert_eq!(r.mastery(), Mastery::Learning);
+    }
+
+    #[test]
+    fn later_easy_is_still_easy() {
+        let s = Scheduler::new();
+        let mut now = t0();
+        let mut p = s.review(None, &graded(Grade::Good, 2000), now).0;
+        while p.fsrs.state != State::Review {
+            now = p.due();
+            p = s.review(Some(&p), &graded(Grade::Good, 2000), now).0;
+        }
+        now = p.due();
+        let (easy, _) = s.review(Some(&p), &graded(Grade::Easy, 900), now);
+        let (good, _) = s.review(Some(&p), &graded(Grade::Good, 900), now);
+        assert!(
+            easy.due() > good.due(),
+            "{:?} vs {:?}",
+            easy.due(),
+            good.due()
+        );
+        assert!(easy.fsrs.stability > good.fsrs.stability);
     }
 
     fn review_state(stability: f64, difficulty: f64) -> CardProgress {
