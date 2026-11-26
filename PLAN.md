@@ -15,4 +15,5 @@ written when the phase starts so it targets the code that exists by then. Dashbo
 | P5 Progress + prefs | Progress page (heatmap, history, calendar, forecast), Preferences, custom-binding import, wild mode, OS-shortcut flags, first-launch intro | written at P5 start | `kf-p5` |
 | P6 Scenarios | Multi-step scenario cards + unlock rule | written at P6 start | `kf-p6` |
 | P7 v0.1 | `ux-audit` + fixes, icon (`brand-identity`), macOS/Windows/Linux packages, README screenshots | written at P7 start | `kf-p7` |
+| Website | Docs site for the repo (primary documentation). Includes a **Themes page**: every bundled theme with credits, which colors were changed for WCAG AA and why (measured ratios), and how to use the original colors instead | written when it starts (after P5) | `kf-site` |
 | Later | Vim pack; `M-` cards; FSRS parameter optimisation; `keyfluent drill` in-terminal add-on (maybe) | — | `kf-vim` |
