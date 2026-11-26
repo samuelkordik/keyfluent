@@ -216,10 +216,14 @@ impl Practice {
         }
     }
 
+    /// The session summary: reviews due tomorrow are [`due_tomorrow`] over
+    /// the pack's current cards (ruling 14); new cards waiting are those
+    /// tomorrow's daily cap allows.
     fn finish(self, session_time: Duration) -> Summary {
+        let due = due_tomorrow(&self.refs, &self.pack_progress(), self.clock, utc0());
         let tomorrow = self.clock.checked_add_days(Days::new(1)).unwrap();
-        let p = self.plan(tomorrow);
-        self.summary.finish(session_time, &p)
+        let waiting = u32::try_from(self.plan(tomorrow).new_available).unwrap();
+        self.summary.finish(session_time, due, waiting)
     }
 }
 
@@ -332,7 +336,10 @@ fn full_session_round_trip() {
         }
     );
     assert_eq!(days_this_month(&log.value, now, utc0()), 1);
-    assert_eq!(due_tomorrow(&app.pack_progress(), now, utc0()), 17);
+    assert_eq!(
+        due_tomorrow(&app.refs, &app.pack_progress(), now, utc0()),
+        17
+    );
 
     let summary = app.finish(Duration::from_secs(600));
     assert_eq!(summary.cards, 17);

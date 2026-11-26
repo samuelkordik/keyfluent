@@ -9,7 +9,7 @@ use chrono::{DateTime, Datelike, Days, FixedOffset, NaiveDate, TimeZone, Utc};
 
 use crate::grade::{Grade, Graded};
 use crate::schedule::CardProgress;
-use crate::session::Plan;
+use crate::session::CardRef;
 use crate::store::ReviewRecord;
 
 /// A run of consecutive non-Again results.
@@ -96,15 +96,22 @@ impl SummaryBuilder {
         &self.combo
     }
 
-    pub fn finish(self, session_time: Duration, plan_tomorrow: &Plan) -> Summary {
+    /// The summary. `next_reviews_tomorrow` is [`due_tomorrow`] for the
+    /// pack; `new_waiting` is the new cards the next session could introduce.
+    pub fn finish(
+        self,
+        session_time: Duration,
+        next_reviews_tomorrow: u32,
+        new_waiting: u32,
+    ) -> Summary {
         Summary {
             cards: self.cards,
             time: session_time,
             best_combo: self.combo.best(),
             per_grade: self.per_grade,
             new_bests: self.new_bests,
-            next_reviews_tomorrow: u32::try_from(plan_tomorrow.due).unwrap_or(u32::MAX),
-            new_waiting: u32::try_from(plan_tomorrow.new_available).unwrap_or(u32::MAX),
+            next_reviews_tomorrow,
+            new_waiting,
         }
     }
 }
@@ -124,8 +131,11 @@ pub fn days_this_month(reviews: &[ReviewRecord], now: DateTime<Utc>, offset: Fix
     u32::try_from(dates.len()).unwrap_or(u32::MAX)
 }
 
-/// Cards due before the end of the next local day (including cards already due).
+/// The pack's cards due by the end of the next local day, including cards
+/// already due (ruling 14). Only `cards` count, and never scenarios, so
+/// progress for cards no longer in the pack is ignored.
 pub fn due_tomorrow(
+    cards: &[CardRef],
     progress: &BTreeMap<String, CardProgress>,
     now: DateTime<Utc>,
     offset: FixedOffset,
@@ -136,7 +146,12 @@ pub fn due_tomorrow(
         .and_then(|t| offset.from_local_datetime(&t).single())
         .map(|t| t.with_timezone(&Utc));
     let Some(end) = end else { return 0 };
-    let n = progress.values().filter(|p| p.due() < end).count();
+    let n = cards
+        .iter()
+        .filter(|c| !c.is_scenario)
+        .filter_map(|c| progress.get(&c.id))
+        .filter(|p| p.due() < end)
+        .count();
     u32::try_from(n).unwrap_or(u32::MAX)
 }
 
@@ -217,11 +232,7 @@ mod tests {
         b.add("a", &graded(Grade::Good, 2000), true, true);
         b.add("b", &graded(Grade::Easy, 900), true, false);
         b.add("c", &graded(Grade::Hard, 4000), false, false);
-        let plan = Plan {
-            due: 7,
-            new_available: 4,
-        };
-        let s = b.finish(Duration::from_secs(60), &plan);
+        let s = b.finish(Duration::from_secs(60), 7, 4);
         assert_eq!(s.cards, 3);
         assert_eq!(s.per_grade, [1, 1, 1, 1]);
         assert_eq!(s.best_combo, 3);
@@ -268,7 +279,22 @@ mod tests {
             ("tomorrow".to_string(), prog("2026-11-28T04:59:59Z")),
             ("edge".to_string(), prog("2026-11-28T05:00:00Z")),
             ("later".to_string(), prog("2026-12-30T00:00:00Z")),
+            ("removed".to_string(), prog("2026-11-20T00:00:00Z")),
+            ("scenario".to_string(), prog("2026-11-20T00:00:00Z")),
         ]);
-        assert_eq!(due_tomorrow(&progress, now, off), 2);
+        let card = |id: &str, is_scenario| CardRef {
+            id: id.to_string(),
+            requires: Vec::new(),
+            is_scenario,
+        };
+        let cards = [
+            card("past", false),
+            card("tomorrow", false),
+            card("edge", false),
+            card("later", false),
+            card("scenario", true),
+            card("unseen", false),
+        ];
+        assert_eq!(due_tomorrow(&cards, &progress, now, off), 2);
     }
 }
