@@ -134,6 +134,24 @@ mod tests {
     }
 
     #[test]
+    fn typed_chars_count_and_the_median_is_not_the_mean() {
+        // 30 cards of 1 key + 4 chars with a 1.0 s reaction (1.0 + 0.4 +
+        // 0.6 s) and 20 cards of 2 keys with a 3.0 s reaction (3.0 + 0.8 s):
+        // the median reaction is 1.0 s, the mean would be 1.8 s.
+        let typed = Sample {
+            time: Duration::from_millis(2000),
+            binding_keys: 1,
+            typed_chars: 4,
+            success: true,
+        };
+        let mut h = vec![typed; 30];
+        h.extend(vec![sample(3800, 2, true); 20]);
+        let r = reaction(&h);
+        let diff = r.abs_diff(Duration::from_millis(1000));
+        assert!(diff < Duration::from_millis(1), "{r:?}");
+    }
+
+    #[test]
     fn graded_converts_with_canonical_counts() {
         use crate::grade::{Attempt, CardShape};
         let shape = CardShape {
