@@ -286,7 +286,8 @@ mod tests {
         let (p, _) = s.review(None, &graded(Grade::Good, 2000), t0());
         let earlier = t0() - chrono::Duration::days(3);
         let (p2, _) = s.review(Some(&p), &graded(Grade::Good, 2000), earlier);
-        assert!(p2.fsrs.last_review >= p.fsrs.last_review);
+        // The review is taken at the clamped time: the previous review.
+        assert_eq!(p2.fsrs.last_review, p.fsrs.last_review);
         assert!(p2.due() >= p.fsrs.last_review);
     }
 
