@@ -121,7 +121,7 @@ pub struct CardShape {
 
 /// Why an attempt failed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum Fail {
     TooManyKeys,
     Timeout,
@@ -134,6 +134,7 @@ pub struct Attempt {
     shape: CardShape,
     target: Duration,
     keys: usize,
+    chars: usize,
     ran: Vec<RanBinding>,
 }
 
@@ -143,10 +144,14 @@ pub struct Graded {
     pub grade: Grade,
     pub time: Duration,
     pub target: Duration,
-    /// The card's canonical binding-key count (what `target` was built from).
+    /// Binding keys the learner actually pressed.
     pub binding_keys: usize,
-    /// The card's canonical typed-character count.
+    /// Characters the learner actually typed (text entry).
     pub typed_chars: usize,
+    /// The card's canonical binding-key count (what `target` was built from).
+    pub canonical_keys: usize,
+    /// The card's canonical typed-character count.
+    pub canonical_chars: usize,
     pub fail: Option<Fail>,
     /// A fast, correct attempt that skipped a practiced binding was held to Good.
     pub capped: bool,
@@ -160,6 +165,7 @@ impl Attempt {
             shape,
             target,
             keys: 0,
+            chars: 0,
             ran: Vec::new(),
         }
     }
@@ -168,6 +174,7 @@ impl Attempt {
     /// keys exceed the canonical count plus the slack. Text entry is free.
     pub fn record(&mut self, outcome: &KeyOutcome, _at: Duration) -> Option<Fail> {
         if outcome.text_entry {
+            self.chars = self.chars.saturating_add(1);
             return None;
         }
         self.keys = self.keys.saturating_add(1);
@@ -224,8 +231,10 @@ impl Attempt {
             grade,
             time,
             target: self.target,
-            binding_keys: self.shape.binding_keys,
-            typed_chars: self.shape.typed_chars,
+            binding_keys: self.keys,
+            typed_chars: self.chars,
+            canonical_keys: self.shape.binding_keys,
+            canonical_chars: self.shape.typed_chars,
             fail,
             capped,
             practiced: self.shape.practiced,
@@ -293,7 +302,8 @@ mod tests {
     fn speed_and_grade_serde_lowercase() {
         assert_eq!(serde_json_like(Speed::Brisk), "\"brisk\"");
         assert_eq!(serde_json_like(Grade::Easy), "\"easy\"");
-        assert_eq!(serde_json_like(Fail::TooManyKeys), "\"toomanykeys\"");
+        assert_eq!(serde_json_like(Fail::TooManyKeys), "\"too_many_keys\"");
+        assert_eq!(serde_json_like(Fail::Hint), "\"hint\"");
     }
 
     fn serde_json_like<T: Serialize>(v: T) -> String {
@@ -324,6 +334,31 @@ mod tests {
     fn extra_keys_downgrade() {
         assert_eq!(attempt(2, 5).succeed(ms(1000)).grade, Grade::Hard);
         assert_eq!(attempt(2, 3).succeed(ms(1000)).grade, Grade::Good);
+    }
+
+    #[test]
+    fn graded_carries_pressed_and_canonical_counts() {
+        let mut a = Attempt::new(shape(2, vec![]), ms(2000));
+        for _ in 0..4 {
+            a.record(&press(None), ms(0));
+        }
+        let typed = KeyOutcome {
+            text_entry: true,
+            ran: None,
+        };
+        for _ in 0..3 {
+            a.record(&typed, ms(0));
+        }
+        let g = a.succeed(ms(1000));
+        assert_eq!(
+            (
+                g.binding_keys,
+                g.typed_chars,
+                g.canonical_keys,
+                g.canonical_chars
+            ),
+            (4, 3, 2, 0)
+        );
     }
 
     #[test]
