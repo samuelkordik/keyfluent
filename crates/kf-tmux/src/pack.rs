@@ -2,8 +2,11 @@
 
 use kf_core::card::{load_cards, Card, CardError, Step};
 use kf_core::key::Key;
+use kf_core::RanBinding;
 
 use crate::goal::Goal;
+use crate::sim::Tmux;
+use crate::{fixtures, stock};
 
 const BASICS: &str = include_str!("../cards/basics.toml");
 
@@ -28,10 +31,48 @@ pub fn canonical_keys(card: &Card<Goal>) -> Vec<Key> {
     out
 }
 
+/// The bindings a card's canonical answer runs: replays the canonical keys
+/// from the card's start fixture with the stock tables and collects every
+/// binding that ran. Empty if the start fixture is unknown.
+pub fn practiced_bindings(card: &Card<Goal>) -> Vec<RanBinding> {
+    let Some(server) = fixtures::get(&card.start) else {
+        return Vec::new();
+    };
+    let mut tmux = Tmux::new(server, stock::tables().clone());
+    canonical_keys(card)
+        .iter()
+        .filter_map(|k| tmux.key(k).ran)
+        .collect()
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 mod tests {
     use super::*;
+
+    fn card(id: &str) -> Card<Goal> {
+        basics().unwrap().into_iter().find(|c| c.id == id).unwrap()
+    }
+
+    #[test]
+    fn practiced_split_h() {
+        let p = practiced_bindings(&card("split-h"));
+        assert_eq!(p.len(), 1);
+        assert_eq!(
+            (
+                p[0].table.as_str(),
+                p[0].key.to_string(),
+                p[0].command.as_str()
+            ),
+            ("prefix", "%".to_string(), "split-window")
+        );
+    }
+
+    #[test]
+    fn practiced_window_rename_starts_with_command_prompt() {
+        let p = practiced_bindings(&card("window-rename"));
+        assert_eq!(p[0].command, "command-prompt");
+    }
 
     #[test]
     fn text_space_becomes_space_key() {

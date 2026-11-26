@@ -2,6 +2,7 @@
 
 pub mod bindings;
 pub mod card;
+pub mod grade;
 pub mod grid;
 pub mod key;
 
