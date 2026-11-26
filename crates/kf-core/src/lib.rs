@@ -8,6 +8,7 @@ pub mod key;
 
 pub mod prefs;
 pub mod schedule;
+pub mod session;
 pub mod speed;
 pub mod store;
 
