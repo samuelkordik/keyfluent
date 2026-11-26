@@ -142,11 +142,22 @@ struct Scheduled {
 }
 
 /// A practice session in progress.
+///
+/// Spacing rules (controller rulings 10 and 11):
+/// - An intro (Show, Guided, Recall) is never interrupted.
+/// - A scheduled review (a new card's first review, or a retry after an
+///   Again) waits for at least its gap (2 items after Recall, 3 after an
+///   Again). It is served at the next free slot after that, or at the end
+///   if nothing else is left. Slots can collide, for example when the gap
+///   runs out during an intro or two reviews come due together. The gap is
+///   then longer, never shorter.
+/// - Retries are never wild and don't count toward Sometimes' alternation.
 #[derive(Debug)]
 pub struct Session {
     due: VecDeque<String>,
     new: VecDeque<String>,
-    /// The new card being introduced and its next step.
+    /// The new card being introduced and its next step. Show is served as
+    /// the intro starts, so this only ever holds Guided or Recall.
     intro: Option<(String, IntroStep)>,
     /// Scheduled reviews, in the order they were scheduled.
     scheduled: Vec<Scheduled>,
@@ -256,7 +267,8 @@ impl Session {
     }
 
     fn review(&mut self, card: String, retry: bool) -> Item {
-        let wild = self.wild_eligible.contains(&card)
+        let wild = !retry
+            && self.wild_eligible.contains(&card)
             && match self.wild_mode {
                 WildMode::Off => false,
                 WildMode::Always => true,
@@ -268,8 +280,9 @@ impl Session {
         Item::Review { card, wild, retry }
     }
 
-    /// Report how an item went. Intro steps report `None`; a review reports
-    /// its grade. An Again brings the card back three items later, at most
+    /// Report how an item went. Report each served item exactly once, right
+    /// after it is done. Intro steps report `None`; a review reports its
+    /// grade. An Again brings the card back three items later, at most
     /// twice per card per session.
     pub fn report(&mut self, item: &Item, result: Option<&Graded>) {
         let Item::Review { card, .. } = item else {
@@ -292,10 +305,10 @@ impl Session {
 
     /// Items left to serve, not counting retries that may still come.
     pub fn remaining(&self) -> usize {
+        // The stored step is Guided (2 steps left) or Recall (1 left).
         let intro = match &self.intro {
-            Some((_, IntroStep::Show)) => 3,
             Some((_, IntroStep::Guided)) => 2,
-            Some((_, IntroStep::Recall)) => 1,
+            Some(_) => 1,
             None => 0,
         };
         // A pending intro still owes its first review.
@@ -740,6 +753,63 @@ components = ["a"]
         assert!(items
             .iter()
             .all(|i| !matches!(i, Item::Review { wild: true, .. })));
+    }
+
+    #[test]
+    fn retries_are_never_wild() {
+        let cards = [card("s", &[])];
+        let progress = BTreeMap::from([("s".to_string(), prog(1, 30.0))]);
+        let prefs = Prefs {
+            wild_mode: WildMode::Always,
+            ..Prefs::default()
+        };
+        let mut s = session(&cards, &progress, &prefs);
+        let first = s.next().unwrap();
+        assert_eq!(
+            first,
+            Item::Review {
+                card: "s".to_string(),
+                wild: true,
+                retry: false
+            }
+        );
+        s.report(&first, Some(&graded(Grade::Again)));
+        assert_eq!(s.next(), Some(retry("s")));
+    }
+
+    #[test]
+    fn intros_are_never_interrupted() {
+        let cards = [card("A", &[]), card("B", &[]), card("C", &[])];
+        let mut s = session(&cards, &BTreeMap::new(), &Prefs::default());
+        assert_eq!(s.remaining(), 12);
+        let mut expected = intros("A");
+        expected.extend(intros("B"));
+        expected.push(rev("A"));
+        expected.extend(intros("C"));
+        expected.extend([rev("B"), rev("C")]);
+        let mut items = Vec::new();
+        while let Some(item) = s.next() {
+            items.push(item);
+            // remaining() counts down by one per served item.
+            assert_eq!(s.remaining(), 12 - items.len());
+        }
+        assert_eq!(items, expected);
+    }
+
+    #[test]
+    fn empty_and_all_scenario_packs_have_nothing() {
+        let none = Plan {
+            due: 0,
+            new_available: 0,
+        };
+        let prefs = Prefs::default();
+        assert_eq!(session(&[], &BTreeMap::new(), &prefs).next(), None);
+        assert_eq!(plan(&[], &BTreeMap::new(), &prefs, 0, now()), none);
+        let cards = [scenario("s1"), scenario("s2")];
+        let mut s = session(&cards, &BTreeMap::new(), &prefs);
+        assert_eq!(s.remaining(), 0);
+        assert_eq!(s.next(), None);
+        assert_eq!(plan(&cards, &BTreeMap::new(), &prefs, 0, now()), none);
     }
 
     fn record(at: DateTime<Utc>, pack: &str, card: &str, intro: bool) -> ReviewRecord {
