@@ -120,9 +120,9 @@
 **Interfaces:**
 - Produces:
   - `pub struct Combo { current: u32, best: u32 }` with `push(&mut self, g: Grade)` (any non-Again extends; Again resets current to 0 silently), `current()`, `best()`.
-  - `pub struct Summary { pub cards: u32, pub time: Duration, pub best_combo: u32, pub per_grade: [u32; 4] /* Again, Hard, Good, Easy */, pub new_bests: Vec<(String, Duration)>, pub next_reviews_tomorrow: u32, pub new_waiting: u32 }` and `SummaryBuilder` with `add(&mut self, card: &str, graded: &Graded, new_best: bool)` and `finish(self, session_time: Duration, plan_tomorrow: &Plan) -> Summary` (intro steps and retries: retries count in per_grade and combo, not in `cards`).
+  - `pub struct Summary { pub cards: u32, pub time: Duration, pub best_combo: u32, pub per_grade: [u32; 4] /* Again, Hard, Good, Easy */, pub new_bests: Vec<(String, Duration)>, pub next_reviews_tomorrow: u32, pub new_waiting: u32 }` and `SummaryBuilder` with `add(&mut self, card: &str, graded: &Graded, new_best: bool, retry: bool)` and `finish(self, session_time: Duration, next_reviews_tomorrow: u32, new_waiting: u32) -> Summary` (intro steps and retries: retries count in per_grade and combo, not in `cards`).
   - `pub fn days_this_month(reviews: &[ReviewRecord], now: DateTime<Utc>, offset: FixedOffset) -> u32` (distinct local dates in the current local month).
-  - `pub fn due_tomorrow(progress: &BTreeMap<String, CardProgress>, now: DateTime<Utc>, offset: FixedOffset) -> u32` (cards due by the end of the next local day).
+  - `pub fn due_tomorrow(cards: &[CardRef], progress: &BTreeMap<String, CardProgress>, now: DateTime<Utc>, offset: FixedOffset) -> u32` (the pack's non-scenario cards due by the end of the next local day, Ruling 14; the summary's `next_reviews_tomorrow`).
 
 - [ ] **Step 1: Failing tests:** combo Good Easy Hard Again Good → current 1, best 3; summary counts per grade and `cards` excludes retries; new bests listed in order; days_this_month with records on 3 local dates this month, 1 last month and 2 on the same day → 3, including one at 23:30 local that is the next day in UTC; due_tomorrow boundary at local midnight.
 - [ ] **Step 2–4:** fail → implement → pass. **Step 5:** Commit `feat(core): combo, summary, days this month`.
