@@ -10,6 +10,7 @@ pub mod prefs;
 pub mod schedule;
 pub mod session;
 pub mod speed;
+pub mod stats;
 pub mod store;
 
 /// Crate version, shared by the whole workspace.
