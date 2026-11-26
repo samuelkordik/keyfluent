@@ -143,14 +143,29 @@ impl Store {
         &self.root
     }
 
-    /// Missing or unreadable prefs load as the defaults.
+    /// Missing or unreadable prefs load as the defaults. A field with an
+    /// unknown or invalid value takes its default and the others load; the
+    /// original file is then copied aside so the value isn't lost.
     pub fn load_prefs(&self, now: DateTime<Utc>) -> Loaded<Prefs> {
         let mut notes = Vec::new();
         let value = match self.read(PREFS) {
             Ok(None) => Prefs::default(),
             Ok(Some(bytes)) => match serde_json::from_slice(&bytes) {
-                Ok(prefs) => prefs,
-                Err(_) => {
+                Ok(serde_json::Value::Object(fields)) => {
+                    let (prefs, bad) = Prefs::from_fields(&fields);
+                    if !bad.is_empty() {
+                        for field in bad {
+                            notes.push(format!(
+                                "{PREFS}: {field} had an unreadable value; using the default"
+                            ));
+                        }
+                        notes.push(self.copy_aside(PREFS, now).unwrap_or_else(|e| {
+                            format!("{PREFS}: the original file could not be copied aside ({e})")
+                        }));
+                    }
+                    prefs
+                }
+                _ => {
                     notes.push(self.set_aside(PREFS, now, "using defaults"));
                     Prefs::default()
                 }
@@ -586,6 +601,33 @@ mod tests {
         assert_eq!(p.value.speed, Speed::Relaxed);
         assert_eq!(p.value.scenario_unlock_days, 7);
         assert!(p.notes.is_empty());
+    }
+
+    #[test]
+    fn one_bad_pref_keeps_the_others() {
+        let (_d, s) = store();
+        fs::create_dir_all(&s.root).unwrap();
+        let text = r#"{"speed": "turbo", "wild_mode": "always", "option_as_meta": false}"#;
+        fs::write(s.root.join("prefs.json"), text).unwrap();
+        let p = s.load_prefs(now());
+        assert_eq!(
+            p.value,
+            Prefs {
+                wild_mode: WildMode::Always,
+                option_as_meta: false,
+                ..Prefs::default()
+            }
+        );
+        let ts = now().timestamp();
+        assert_eq!(
+            p.notes,
+            vec![
+                "prefs.json: speed had an unreadable value; using the default".to_string(),
+                format!("prefs.json: the original file was kept as prefs.json.bad-{ts}"),
+            ]
+        );
+        let kept = s.root.join(format!("prefs.json.bad-{ts}"));
+        assert_eq!(fs::read_to_string(kept).unwrap(), text);
     }
 
     #[test]
