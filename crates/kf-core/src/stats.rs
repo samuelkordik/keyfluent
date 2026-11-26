@@ -244,7 +244,10 @@ mod tests {
             rec("2026-11-03T15:00:00Z"),
             rec("2026-11-10T15:00:00Z"),
             rec("2026-11-10T16:00:00Z"),
-            // 23:30 local on the 20th is the 21st in UTC: still one day (the 20th).
+            // 10:00 local on the 20th (the 20th in UTC too).
+            rec("2026-11-20T15:00:00Z"),
+            // 23:30 local on the 20th is the 21st in UTC: the same local day
+            // as the record above, so the two count once.
             rec("2026-11-21T04:30:00Z"),
             // last month
             rec("2026-10-31T15:00:00Z"),
@@ -257,8 +260,9 @@ mod tests {
     #[test]
     fn due_tomorrow_ends_at_local_midnight() {
         let off = FixedOffset::west_opt(5 * 3600).unwrap();
-        let now = utc("2026-11-26T15:00:00Z"); // 10:00 local on the 26th
-                                               // End of tomorrow = 2026-11-28T00:00 local = 05:00 UTC.
+        // 10:00 local on the 26th.
+        let now = utc("2026-11-26T15:00:00Z");
+        // End of tomorrow = 2026-11-28T00:00 local = 05:00 UTC.
         let progress = BTreeMap::from([
             ("past".to_string(), prog("2026-11-20T00:00:00Z")),
             ("tomorrow".to_string(), prog("2026-11-28T04:59:59Z")),
