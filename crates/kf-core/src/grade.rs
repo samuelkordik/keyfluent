@@ -172,6 +172,11 @@ impl Attempt {
 
     /// Records one key's outcome. Returns `Some(TooManyKeys)` once binding
     /// keys exceed the canonical count plus the slack. Text entry is free.
+    ///
+    /// Caller contract: after recording a key, check the card's goal first.
+    /// If that key met the goal, call [`Attempt::succeed`] and ignore a
+    /// `TooManyKeys` returned for it (the attempt grades Hard); only an
+    /// over-budget key that leaves the goal unmet fails the attempt.
     pub fn record(&mut self, outcome: &KeyOutcome, _at: Duration) -> Option<Fail> {
         if outcome.text_entry {
             self.chars = self.chars.saturating_add(1);

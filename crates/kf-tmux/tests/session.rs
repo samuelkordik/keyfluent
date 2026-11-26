@@ -2,6 +2,8 @@
 //! schedule, store and summarise, wired the way the app (P3) will wire them.
 //!
 //! The wiring rules this file follows (P3 obligations):
+//! - after each key the goal is checked before the key budget: a key that
+//!   meets the goal completes the attempt even when it is over budget;
 //! - every served item is reported exactly once, right after it is done;
 //! - intro steps report `None` and never reach `SummaryBuilder::add`;
 //! - reviews pass `retry` from the item to `SummaryBuilder::add`;
@@ -59,7 +61,9 @@ fn shape(card: &Card<Goal>) -> CardShape {
 }
 
 /// Drives a fresh simulator from the card's start fixture with `keys`, one
-/// every [`KEY_GAP`], checking the goal after each key as the app does.
+/// every [`KEY_GAP`], checking the goal after each key as the app does. The
+/// goal is checked before the key budget: a key that meets the goal
+/// completes the attempt even if it is over budget (graded Hard then).
 /// Stops at the first failure or once the goal is met; a route that runs out
 /// of keys without meeting the goal panics (tests only give complete routes
 /// or routes that fail).
@@ -74,11 +78,12 @@ fn attempt(card: &Card<Goal>, target: Duration, keys: &[Key]) -> Graded {
             return a.fail(why, at);
         }
         let outcome = tmux.key_at(k, at);
-        if let Some(why) = a.record(&outcome, at) {
-            return a.fail(why, at);
-        }
+        let over_budget = a.record(&outcome, at);
         if card.goal.met(tmux.server()) {
             return a.succeed(at);
+        }
+        if let Some(why) = over_budget {
+            return a.fail(why, at);
         }
     }
     panic!("{}: keys ran out before the goal or a failure", card.id);
@@ -375,10 +380,14 @@ fn wrong_keys_fail_and_retry() {
 
     let mut served = Vec::new();
     let mut split_h = Vec::new();
+    let mut combo_after_again = None;
     while let Some(item) = session.next() {
         let graded = app.serve(&mut session, &item, &keys_for);
         if let (Item::Review { card, retry, .. }, Some(g)) = (&item, graded) {
             if card == "split-h" {
+                if g.grade == Grade::Again {
+                    combo_after_again = Some(*app.summary.combo());
+                }
                 split_h.push((served.len(), *retry, g));
             }
         }
@@ -410,6 +419,23 @@ fn wrong_keys_fail_and_retry() {
         }
     ));
 
+    // The Again resets the combo: right after it the run is 0 and the best
+    // is the run before it; the best at the end is the longest run of
+    // non-Again reviews on either side.
+    let reviews_before = served[..*first_at]
+        .iter()
+        .filter(|i| matches!(i, Item::Review { .. }))
+        .count();
+    let reviews_after = served[*first_at + 1..]
+        .iter()
+        .filter(|i| matches!(i, Item::Review { .. }))
+        .count();
+    assert_eq!(reviews_before + reviews_after, 17);
+    let combo = combo_after_again.expect("combo recorded after the Again");
+    assert_eq!(combo.current(), 0);
+    assert_eq!(combo.best(), u32::try_from(reviews_before).unwrap());
+    let expected_combo = u32::try_from(reviews_before.max(reviews_after)).unwrap();
+
     // The log keeps both attempts; the summary counts the card once.
     let log = app.store.load_reviews().value;
     let grades: Vec<Grade> = log
@@ -421,4 +447,23 @@ fn wrong_keys_fail_and_retry() {
     let summary = app.finish(Duration::from_secs(600));
     assert_eq!(summary.cards, 17);
     assert_eq!(summary.per_grade, [1, 0, 0, 17]);
+    assert_eq!(summary.best_combo, expected_combo);
+}
+
+#[test]
+fn a_key_that_meets_the_goal_completes_even_over_budget() {
+    let cards = pack::basics().unwrap();
+    let split_h = cards.iter().find(|c| c.id == "split-h").unwrap();
+    assert_eq!(split_h.binding_key_count(), 2);
+    // Four unbound keys, then the right ones: the 6th binding key is over
+    // the budget (2 + 3 slack) but meets the goal.
+    let keys: Vec<Key> = ["F5", "F6", "F7", "F8", "C-b", "%"]
+        .iter()
+        .map(|k| k.parse().unwrap())
+        .collect();
+    let target = Target::standard(Speed::Normal).for_card(2, 0);
+    let g = attempt(split_h, target, &keys);
+    assert_eq!(g.fail, None, "{g:?}");
+    assert_eq!(g.grade, Grade::Hard, "{g:?}");
+    assert_eq!(g.binding_keys, 6);
 }
