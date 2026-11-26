@@ -18,6 +18,12 @@ allow = [
   # Fonts bundled by egui (permissive, attribution required — to be listed in third-party notices):
   "OFL-1.1", "Ubuntu-font-1.0",
 ]
+# option-ext (via directories -> dirs-sys, used to find the per-user data folder) is MPL-2.0:
+# file-level copyleft, unmodified and published on crates.io, so it is compatible with an MIT
+# app. Allowed for that one crate only.
+exceptions = [
+  { allow = ["MPL-2.0"], crate = "option-ext" },
+]
 
 [bans]
 multiple-versions = "allow"

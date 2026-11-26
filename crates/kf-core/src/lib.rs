@@ -6,8 +6,10 @@ pub mod grade;
 pub mod grid;
 pub mod key;
 
+pub mod prefs;
 pub mod schedule;
 pub mod speed;
+pub mod store;
 
 /// Crate version, shared by the whole workspace.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

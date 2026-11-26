@@ -5,7 +5,7 @@
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use rs_fsrs::{Card, Parameters, Rating, State, FSRS};
+use rs_fsrs::{Card, Parameters, Rating, Seed, State, FSRS};
 use serde::{Deserialize, Serialize};
 
 use crate::grade::{Grade, Graded};
@@ -94,6 +94,21 @@ impl CardProgress {
     }
 }
 
+/// A never-reviewed FSRS card, due at `now`.
+pub(crate) fn new_card(now: DateTime<Utc>) -> Card {
+    Card {
+        due: now,
+        last_review: now,
+        stability: 0.0,
+        difficulty: 0.0,
+        elapsed_days: 0,
+        scheduled_days: 0,
+        reps: 0,
+        lapses: 0,
+        state: State::New,
+    }
+}
+
 /// Schedules reviews with FSRS (retention 0.9, short-term on, fuzz off).
 pub struct Scheduler {
     fsrs: FSRS,
@@ -112,6 +127,8 @@ impl Scheduler {
                 request_retention: 0.9,
                 enable_short_term: true,
                 enable_fuzz: false,
+                // A fixed seed: the default one is the current time.
+                seed: Seed::new("keyfluent"),
                 ..Default::default()
             }),
         }
@@ -128,11 +145,7 @@ impl Scheduler {
         let mut next = match progress {
             Some(p) => p.clone(),
             None => CardProgress {
-                fsrs: Card {
-                    due: now,
-                    last_review: now,
-                    ..Default::default()
-                },
+                fsrs: new_card(now),
                 reviews: 0,
                 best: None,
                 last_times: Vec::new(),
