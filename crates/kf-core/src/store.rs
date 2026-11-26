@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use chrono::{DateTime, TimeZone, Utc};
+use rs_fsrs::State;
 use serde::{Deserialize, Serialize};
 
 use crate::grade::{Fail, Grade};
@@ -156,9 +157,15 @@ impl Store {
         self.write_atomic(PREFS, &bytes)
     }
 
-    /// Missing progress loads empty; unreadable progress is set aside and
-    /// loads empty. A newer schema is refused and the file left untouched.
-    /// Cards with out-of-range scheduling data have their schedule reset.
+    /// Missing progress loads empty; progress whose top level can't be read
+    /// is set aside whole and loads empty. A newer schema is refused and the
+    /// file left untouched. Cards are read one by one, so one odd card never
+    /// costs the rest: a card with out-of-range scheduling data has its
+    /// schedule reset; a card whose scheduling data can't be read has it
+    /// reset too, and a card that can't be read at all is dropped. In each
+    /// case the original file is copied aside, once, so nothing stored is
+    /// lost; if that copy fails the load fails (and the caller must not
+    /// save over the file).
     pub fn load_progress(&self, now: DateTime<Utc>) -> Result<Loaded<Progress>, StoreError> {
         let Some(bytes) = self.read(PROGRESS)? else {
             return Ok(Loaded {
@@ -172,35 +179,63 @@ impl Store {
                 let schema = v.get("schema")?.as_u64()?;
                 Some((schema, v))
             });
-        let progress = match parsed {
+        let packs = match parsed {
             Some((schema, _)) if schema > u64::from(SCHEMA) => {
                 return Err(StoreError::FutureSchema(
                     u32::try_from(schema).unwrap_or(u32::MAX),
                 ));
             }
-            Some((schema, v)) if schema == u64::from(SCHEMA) => {
-                serde_json::from_value::<Progress>(v).ok()
-            }
+            Some((schema, mut v)) if schema == u64::from(SCHEMA) => v
+                .get_mut("packs")
+                .map(serde_json::Value::take)
+                .and_then(|p| serde_json::from_value::<RawPacks>(p).ok()),
             _ => None,
         };
-        let Some(mut progress) = progress else {
+        let Some(packs) = packs else {
             let note = self.try_set_aside(PROGRESS, now, "starting fresh")?;
             return Ok(Loaded {
                 value: Progress::default(),
                 notes: vec![note],
             });
         };
+        let mut progress = Progress::default();
         let mut notes = Vec::new();
-        for (pack, cards) in &mut progress.packs {
-            for (card, p) in cards {
-                if !plausible(p) {
-                    p.fsrs = new_card(now);
-                    notes.push(format!(
-                        "{PROGRESS}: card {pack}/{card} had out-of-range scheduling data; \
-                         its schedule was reset"
-                    ));
+        let mut lost = false;
+        for (pack, cards) in packs {
+            let kept = progress.packs.entry(pack.clone()).or_default();
+            for (card, raw) in cards {
+                match read_card(raw, now) {
+                    CardRead::Ok(p) if plausible(&p) => {
+                        kept.insert(card, p);
+                    }
+                    CardRead::Ok(mut p) => {
+                        lost = true;
+                        p.fsrs = new_card(now);
+                        notes.push(format!(
+                            "{PROGRESS}: card {pack}/{card} had out-of-range scheduling data; \
+                             its schedule was reset"
+                        ));
+                        kept.insert(card, p);
+                    }
+                    CardRead::ScheduleUnreadable(p) => {
+                        lost = true;
+                        notes.push(format!(
+                            "{PROGRESS}: card {pack}/{card} had unreadable scheduling data; \
+                             its schedule was reset"
+                        ));
+                        kept.insert(card, p);
+                    }
+                    CardRead::Unreadable => {
+                        lost = true;
+                        notes.push(format!(
+                            "{PROGRESS}: card {pack}/{card} was unreadable and was left out"
+                        ));
+                    }
                 }
             }
+        }
+        if lost {
+            notes.push(self.copy_aside(PROGRESS, now)?);
         }
         Ok(Loaded {
             value: progress,
@@ -293,6 +328,21 @@ impl Store {
         outcome: &str,
     ) -> Result<String, StoreError> {
         let from = self.root.join(name);
+        let kept = self.free_bad_name(name, now)?;
+        fs::rename(&from, self.root.join(&kept)).map_err(io_err(&from))?;
+        Ok(format!("{name} was unreadable; kept as {kept}; {outcome}"))
+    }
+
+    /// Copy a file aside (it stays in place) and describe what happened.
+    fn copy_aside(&self, name: &str, now: DateTime<Utc>) -> Result<String, StoreError> {
+        let from = self.root.join(name);
+        let kept = self.free_bad_name(name, now)?;
+        fs::copy(&from, self.root.join(&kept)).map_err(io_err(&from))?;
+        Ok(format!("{name}: the original file was kept as {kept}"))
+    }
+
+    /// The first unused `<name>.bad-<ts>[-n]` in the store's folder.
+    fn free_bad_name(&self, name: &str, now: DateTime<Utc>) -> Result<String, StoreError> {
         let base = format!("{name}.bad-{}", now.timestamp());
         let mut kept = base.clone();
         let mut n = 0;
@@ -300,7 +350,7 @@ impl Store {
             n += 1;
             if n > MAX_BAD_SUFFIX {
                 return Err(StoreError::Io {
-                    path: from,
+                    path: self.root.join(name),
                     source: io::Error::new(
                         io::ErrorKind::AlreadyExists,
                         "no free name to set the unreadable file aside",
@@ -309,8 +359,7 @@ impl Store {
             }
             kept = format!("{base}-{n}");
         }
-        fs::rename(&from, self.root.join(&kept)).map_err(io_err(&from))?;
-        Ok(format!("{name} was unreadable; kept as {kept}; {outcome}"))
+        Ok(kept)
     }
 
     /// Like [`Store::try_set_aside`], but a failure becomes the note.
@@ -350,7 +399,37 @@ fn ends_with_newline_or_empty(file: &mut File) -> io::Result<bool> {
     Ok(last == *b"\n")
 }
 
+/// `progress.json`'s packs, each card still unparsed.
+type RawPacks = BTreeMap<String, BTreeMap<String, serde_json::Value>>;
+
+/// One card read from `progress.json`.
+enum CardRead {
+    Ok(CardProgress),
+    /// Everything but the FSRS state read; the schedule is reset.
+    ScheduleUnreadable(CardProgress),
+    Unreadable,
+}
+
+fn read_card(mut raw: serde_json::Value, now: DateTime<Utc>) -> CardRead {
+    if let Ok(p) = serde_json::from_value::<CardProgress>(raw.clone()) {
+        return CardRead::Ok(p);
+    }
+    let Ok(fresh) = serde_json::to_value(new_card(now)) else {
+        return CardRead::Unreadable;
+    };
+    match raw.get_mut("fsrs") {
+        Some(fsrs) => *fsrs = fresh,
+        None => return CardRead::Unreadable,
+    }
+    match serde_json::from_value::<CardProgress>(raw) {
+        Ok(p) => CardRead::ScheduleUnreadable(p),
+        Err(_) => CardRead::Unreadable,
+    }
+}
+
 /// Whether a card's FSRS state is safe to hand to the scheduler (ruling 7).
+/// Past New, FSRS divides by stability and difficulty must be on its 1–10
+/// scale, so those are held to sane ranges too.
 fn plausible(p: &CardProgress) -> bool {
     let (Some(earliest), Some(latest)) = (
         Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).single(),
@@ -362,7 +441,10 @@ fn plausible(p: &CardProgress) -> bool {
     let real_ok = |x: f64| x.is_finite() && x >= 0.0;
     let count_ok = |n: i64| (0..=MAX_COUNT).contains(&n);
     let c = &p.fsrs;
-    date_ok(c.due)
+    let scheduled_ok =
+        c.state == State::New || (c.stability >= 0.01 && (1.0..=10.0).contains(&c.difficulty));
+    scheduled_ok
+        && date_ok(c.due)
         && date_ok(c.last_review)
         && real_ok(c.stability)
         && real_ok(c.difficulty)
@@ -589,6 +671,8 @@ mod tests {
         cards.insert("big-reps".into(), good.clone());
         cards.insert("negative-stability".into(), good.clone());
         cards.insert("far-due".into(), good.clone());
+        cards.insert("zero-stability".into(), good.clone());
+        cards.insert("zero-difficulty".into(), good.clone());
         s.save_progress(&progress).unwrap();
 
         // Hand-edit the file the way a curious learner might.
@@ -599,12 +683,23 @@ mod tests {
         tmux["big-reps"]["fsrs"]["reps"] = 2147483647.into();
         tmux["negative-stability"]["fsrs"]["stability"] = (-1.0).into();
         tmux["far-due"]["fsrs"]["due"] = "9999-01-01T00:00:00Z".into();
-        fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
+        tmux["zero-stability"]["fsrs"]["state"] = "Review".into();
+        tmux["zero-stability"]["fsrs"]["stability"] = 0.0.into();
+        tmux["zero-difficulty"]["fsrs"]["state"] = "Review".into();
+        tmux["zero-difficulty"]["fsrs"]["difficulty"] = 0.0.into();
+        let edited = serde_json::to_string(&json).unwrap();
+        fs::write(&path, &edited).unwrap();
 
         let loaded = s.load_progress(now()).unwrap();
         let cards = &loaded.value.packs["tmux"];
         assert_eq!(cards["split-horizontal"], good);
-        for id in ["big-reps", "far-due", "negative-stability"] {
+        for id in [
+            "big-reps",
+            "far-due",
+            "negative-stability",
+            "zero-difficulty",
+            "zero-stability",
+        ] {
             let c = &cards[id];
             assert_eq!(c.mastery(), crate::schedule::Mastery::New, "{id}");
             assert_eq!(c.fsrs.reps, 0, "{id}");
@@ -620,8 +715,15 @@ mod tests {
                 "progress.json: card tmux/big-reps had out-of-range scheduling data; its schedule was reset".to_string(),
                 "progress.json: card tmux/far-due had out-of-range scheduling data; its schedule was reset".to_string(),
                 "progress.json: card tmux/negative-stability had out-of-range scheduling data; its schedule was reset".to_string(),
+                "progress.json: card tmux/zero-difficulty had out-of-range scheduling data; its schedule was reset".to_string(),
+                "progress.json: card tmux/zero-stability had out-of-range scheduling data; its schedule was reset".to_string(),
+                format!("progress.json: the original file was kept as progress.json.bad-{}", now().timestamp()),
             ]
         );
+        let kept = s
+            .root
+            .join(format!("progress.json.bad-{}", now().timestamp()));
+        assert_eq!(fs::read_to_string(kept).unwrap(), edited);
         // The reset cards schedule normally afterwards.
         let graded = Graded {
             grade: Grade::Good,
@@ -637,6 +739,114 @@ mod tests {
         };
         let (next, _) = Scheduler::new().review(Some(&cards["big-reps"]), &graded, now());
         assert!(next.due() > now());
+    }
+
+    fn graded(grade: Grade) -> Graded {
+        Graded {
+            grade,
+            time: Duration::from_secs(2),
+            target: Duration::from_secs(3),
+            binding_keys: 2,
+            typed_chars: 0,
+            canonical_keys: 2,
+            canonical_chars: 0,
+            fail: None,
+            capped: false,
+            practiced: Vec::new(),
+        }
+    }
+
+    /// A Review-state card with the given stability and difficulty.
+    fn review_card(stability: f64, difficulty: f64) -> CardProgress {
+        let mut card = sample_progress().packs["tmux"]["split-horizontal"].clone();
+        card.fsrs.state = State::Review;
+        card.fsrs.stability = stability;
+        card.fsrs.difficulty = difficulty;
+        card
+    }
+
+    #[test]
+    fn odd_review_cards_never_cost_the_progress_file() {
+        for (stability, difficulty, grade) in [(0.0, 5.0, Grade::Good), (5.0, 0.0, Grade::Again)] {
+            let (_d, s) = store();
+            let mut progress = sample_progress();
+            let odd = review_card(stability, difficulty);
+            let later = now() + chrono::Duration::days(3);
+            let (next, _) = Scheduler::new().review(Some(&odd), &graded(grade), later);
+            progress
+                .packs
+                .get_mut("tmux")
+                .unwrap()
+                .insert("odd".into(), next.clone());
+            s.save_progress(&progress).unwrap();
+
+            let back = s.load_progress(later).unwrap();
+            assert!(back.notes.is_empty(), "{:?}", back.notes);
+            assert_eq!(back.value, progress);
+            assert_eq!(back.value.packs["tmux"].len(), 2);
+            assert_eq!(names(&s), vec!["progress.json".to_string()]);
+        }
+    }
+
+    #[test]
+    fn one_unreadable_card_spares_the_others_and_is_kept_aside() {
+        let (_d, s) = store();
+        let mut progress = sample_progress();
+        let good = progress.packs["tmux"]["split-horizontal"].clone();
+        let cards = progress.packs.get_mut("tmux").unwrap();
+        cards.insert("bad-reps".into(), good.clone());
+        cards.insert("garbage".into(), good.clone());
+        cards.insert("zoom".into(), good.clone());
+        s.save_progress(&progress).unwrap();
+
+        let path = s.root.join("progress.json");
+        let mut json: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        json["packs"]["tmux"]["bad-reps"]["fsrs"]["reps"] = "x".into();
+        json["packs"]["tmux"]["garbage"] = "not a card".into();
+        let edited = serde_json::to_string(&json).unwrap();
+        fs::write(&path, &edited).unwrap();
+
+        let loaded = s.load_progress(now()).unwrap();
+        let cards = &loaded.value.packs["tmux"];
+        assert_eq!(cards["split-horizontal"], good);
+        assert_eq!(cards["zoom"], good);
+        assert!(!cards.contains_key("garbage"));
+        // The card's own history survives; only its schedule restarts.
+        let reset = &cards["bad-reps"];
+        assert_eq!(reset.fsrs, new_card(now()));
+        assert_eq!(
+            (reset.reviews, reset.best, &reset.last_times),
+            (good.reviews, good.best, &good.last_times)
+        );
+        let ts = now().timestamp();
+        assert_eq!(
+            loaded.notes,
+            vec![
+                "progress.json: card tmux/bad-reps had unreadable scheduling data; its schedule was reset".to_string(),
+                "progress.json: card tmux/garbage was unreadable and was left out".to_string(),
+                format!("progress.json: the original file was kept as progress.json.bad-{ts}"),
+            ]
+        );
+        // The original stays in place too, untouched until the next save.
+        assert_eq!(fs::read_to_string(&path).unwrap(), edited);
+        let kept = s.root.join(format!("progress.json.bad-{ts}"));
+        assert_eq!(fs::read_to_string(kept).unwrap(), edited);
+    }
+
+    #[test]
+    fn unreadable_packs_set_the_file_aside() {
+        let (_d, s) = store();
+        fs::create_dir_all(&s.root).unwrap();
+        fs::write(
+            s.root.join("progress.json"),
+            r#"{"schema": 1, "packs": [1]}"#,
+        )
+        .unwrap();
+        let loaded = s.load_progress(now()).unwrap();
+        assert_eq!(loaded.value, Progress::default());
+        let ts = now().timestamp();
+        assert_eq!(names(&s), vec![format!("progress.json.bad-{ts}")]);
     }
 
     #[test]

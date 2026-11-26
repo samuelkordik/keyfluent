@@ -159,7 +159,15 @@ impl Scheduler {
             Grade::Good => Rating::Good,
             Grade::Easy => Rating::Easy,
         };
-        next.fsrs = self.fsrs.next(next.fsrs, now, rating).card;
+        let scheduled = self.fsrs.next(next.fsrs.clone(), now, rating).card;
+        // rs-fsrs can compute NaN from odd stored values (stability 0 in
+        // Review is 0 * inf); such a card restarts rather than poisoning the
+        // saved progress.
+        next.fsrs = if scheduled.stability.is_finite() && scheduled.difficulty.is_finite() {
+            scheduled
+        } else {
+            new_card(now)
+        };
         next.reviews = next.reviews.saturating_add(1);
 
         let mut new_best = false;
@@ -274,7 +282,7 @@ mod tests {
         let (p, _) = s.review(None, &graded(Grade::Good, 2000), t0());
         let earlier = t0() - chrono::Duration::days(3);
         let (p2, _) = s.review(Some(&p), &graded(Grade::Good, 2000), earlier);
-        assert!(p2.due() >= earlier);
+        assert!(p2.fsrs.last_review >= p.fsrs.last_review);
         assert!(p2.due() >= p.fsrs.last_review);
     }
 
@@ -282,13 +290,40 @@ mod tests {
     fn serde_round_trip_uses_milliseconds() {
         let s = Scheduler::new();
         let (p, _) = s.review(None, &graded(Grade::Good, 2345), t0());
-        let json = serde_json_like(&p);
-        assert!(json.contains("2345"));
-        let back: CardProgress = toml::from_str(&json).unwrap();
+        let text = toml::to_string(&p).unwrap();
+        assert!(text.contains("2345"));
+        let back: CardProgress = toml::from_str(&text).unwrap();
         assert_eq!(back, p);
     }
 
-    fn serde_json_like(p: &CardProgress) -> String {
-        toml::to_string(p).unwrap()
+    fn review_state(stability: f64, difficulty: f64) -> CardProgress {
+        let mut fsrs = new_card(t0());
+        fsrs.state = State::Review;
+        fsrs.stability = stability;
+        fsrs.difficulty = difficulty;
+        fsrs.reps = 3;
+        fsrs.scheduled_days = 2;
+        CardProgress {
+            fsrs,
+            reviews: 3,
+            best: Some(Duration::from_millis(1500)),
+            last_times: vec![Duration::from_millis(1500)],
+        }
+    }
+
+    #[test]
+    fn non_finite_results_restart_the_card() {
+        let s = Scheduler::new();
+        let later = t0() + chrono::Duration::days(2);
+        for (card, grade) in [
+            (review_state(0.0, 5.0), Grade::Good),
+            (review_state(5.0, 0.0), Grade::Again),
+        ] {
+            let (p, _) = s.review(Some(&card), &graded(grade, 2000), later);
+            assert!(p.fsrs.stability.is_finite(), "{p:?}");
+            assert!(p.fsrs.difficulty.is_finite(), "{p:?}");
+            assert_eq!(p.reviews, 4);
+            assert_eq!(p.best, Some(Duration::from_millis(1500)));
+        }
     }
 }
