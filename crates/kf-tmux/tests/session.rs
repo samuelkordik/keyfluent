@@ -29,7 +29,7 @@ use kf_core::schedule::{CardProgress, Scheduler};
 use kf_core::session::{introduced_today, plan, CardRef, IntroStep, Item, Plan, Session};
 use kf_core::speed::{personal_target, Sample};
 use kf_core::stats::{days_this_month, due_tomorrow, Summary, SummaryBuilder};
-use kf_core::store::{Progress, ReviewRecord, Store};
+use kf_core::store::{samples, Progress, ReviewRecord, Store};
 use kf_tmux::goal::Goal;
 use kf_tmux::{fixtures, pack, stock, Tmux};
 use tempfile::TempDir;
@@ -122,7 +122,7 @@ impl Practice {
                 ..Prefs::default()
             },
             progress: loaded.value,
-            history: reviews.value.iter().map(Sample::from).collect(),
+            history: samples(&reviews.value),
             scheduler: Scheduler::new(),
             summary: SummaryBuilder::new(),
             clock: now,

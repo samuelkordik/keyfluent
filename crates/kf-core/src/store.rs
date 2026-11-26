@@ -51,7 +51,21 @@ pub struct ReviewRecord {
     pub fail: Option<Fail>,
     pub capped: bool,
     pub wild: bool,
+    /// Always `false` as the app writes the log: intro steps (Show, Guided,
+    /// Recall) are ungraded and never logged, only graded reviews are. The
+    /// field is kept so a log that does hold intro attempts still reads;
+    /// [`samples`] leaves such records out.
     pub intro: bool,
+}
+
+/// The speed samples in a review log, oldest first. Intro attempts never
+/// count towards the learner's personal speed.
+pub fn samples(records: &[ReviewRecord]) -> Vec<Sample> {
+    records
+        .iter()
+        .filter(|r| !r.intro)
+        .map(Sample::from)
+        .collect()
 }
 
 impl From<&ReviewRecord> for Sample {
@@ -954,6 +968,22 @@ mod tests {
             ..record("a")
         };
         assert!(Sample::from(&ok).success);
+    }
+
+    #[test]
+    fn samples_leave_out_intro_records() {
+        let intro = ReviewRecord {
+            intro: true,
+            time_ms: 9999,
+            ..record("b")
+        };
+        let ok = ReviewRecord {
+            grade: Grade::Good,
+            fail: None,
+            ..record("c")
+        };
+        let got = samples(&[record("a"), intro, ok.clone()]);
+        assert_eq!(got, vec![Sample::from(&record("a")), Sample::from(&ok)]);
     }
 
     #[test]
